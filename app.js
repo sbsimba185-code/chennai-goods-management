@@ -1823,44 +1823,93 @@ function shipmentTable(
             )}
           </td>
 
-          <td>
+          <td class="shipment-actions">
 
-            ${
-              !shipment.delivery_date
-                ? `
-                  <button
-                    class="small-button"
-                    data-action="delivery"
-                    data-id="${escapeHtml(
-                      shipment.id
-                    )}"
-                  >
-                    DELIVER
-                  </button>
-                `
-                : ""
-            }
+  <!-- EDIT -->
+  <button
+    type="button"
+    class="small-button"
+    data-action="edit"
+    data-id="${escapeHtml(
+      shipment.id
+    )}"
+  >
+    EDIT
+  </button>
 
-            ${
-              shipment.delivery_date &&
-              shipment.payment_type ===
-                "TOPAY" &&
-              !shipment.accounts_date
-                ? `
-                  <button
-                    class="small-button"
-                    data-action="accounts"
-                    data-id="${escapeHtml(
-                      shipment.id
-                    )}"
-                  >
-                    ACCOUNTS
-                  </button>
-                `
-                : ""
-            }
 
-          </td>
+  <!-- DELETE -->
+  <button
+    type="button"
+    class="small-button danger-button"
+    data-action="delete"
+    data-id="${escapeHtml(
+      shipment.id
+    )}"
+  >
+    DELETE
+  </button>
+
+
+  <!-- NOT DELIVERED -->
+  ${
+    !shipment.delivery_date
+      ? `
+        <button
+          type="button"
+          class="small-button"
+          data-action="delivery"
+          data-id="${escapeHtml(
+            shipment.id
+          )}"
+        >
+          DELIVER
+        </button>
+      `
+      : ""
+  }
+
+
+  <!-- DELIVERED TOPAY -->
+  ${
+    shipment.delivery_date &&
+    shipment.payment_type === "TOPAY" &&
+    !shipment.accounts_date
+      ? `
+        <button
+          type="button"
+          class="small-button"
+          data-action="accounts"
+          data-id="${escapeHtml(
+            shipment.id
+          )}"
+        >
+          ACCOUNTS
+        </button>
+      `
+      : ""
+  }
+
+
+  <!-- UNDELIVER -->
+  ${
+    shipment.delivery_date
+      ? `
+        <button
+          type="button"
+          class="small-button"
+          data-action="undeliver"
+          data-id="${escapeHtml(
+            shipment.id
+          )}"
+        >
+          UNDELIVER
+        </button>
+      `
+      : ""
+  }
+
+</td>
 
         </tr>
 
