@@ -11,8 +11,20 @@ const loginMessage = document.getElementById("login-message");
 const loginScreen = document.getElementById("login-screen");
 const appShell = document.getElementById("app-shell");
 
+const shipmentForm =
+  document.getElementById("shipment-form");
 
-// Show login
+const formMessage =
+  document.getElementById("form-message");
+
+let accessToken =
+  sessionStorage.getItem("chennai_access_token");
+
+
+/* =========================================================
+   LOGIN SCREEN
+   ========================================================= */
+
 function showLogin() {
   loginScreen.hidden = false;
   loginScreen.style.display = "grid";
@@ -22,104 +34,145 @@ function showLogin() {
 }
 
 
-// Show application
 function showApp() {
   loginScreen.hidden = true;
   loginScreen.style.display = "none";
 
   appShell.hidden = false;
   appShell.style.display = "block";
+
+  loadParties();
+  loadBranches();
 }
 
 
-// Login
-loginForm.addEventListener("submit", async function (event) {
+/* =========================================================
+   SUPABASE HEADERS
+   ========================================================= */
 
-  event.preventDefault();
+function supabaseHeaders() {
+  return {
+    "apikey": SUPABASE_KEY,
+    "Authorization": "Bearer " + accessToken,
+    "Content-Type": "application/json"
+  };
+}
 
-  const email =
-    document.getElementById("login-email").value.trim();
 
-  const password =
-    document.getElementById("login-password").value;
+/* =========================================================
+   LOGIN
+   ========================================================= */
 
-  if (!password) {
-    loginMessage.textContent =
-      "Please enter your password.";
-    return;
-  }
+loginForm.addEventListener(
+  "submit",
+  async function (event) {
 
-  loginButton.disabled = true;
-  loginButton.textContent = "Signing in...";
-  loginMessage.textContent = "Please wait...";
+    event.preventDefault();
 
-  try {
+    const email =
+      document
+        .getElementById("login-email")
+        .value
+        .trim();
 
-    const response = await fetch(
-      SUPABASE_URL +
-      "/auth/v1/token?grant_type=password",
-      {
-        method: "POST",
+    const password =
+      document
+        .getElementById("login-password")
+        .value;
 
-        headers: {
-          "apikey": SUPABASE_KEY,
-          "Content-Type": "application/json"
-        },
+    if (!password) {
+      loginMessage.textContent =
+        "Please enter your password.";
+      return;
+    }
 
-        body: JSON.stringify({
-          email: email,
-          password: password
-        })
+    loginButton.disabled = true;
+    loginButton.textContent = "Signing in...";
+    loginMessage.textContent = "Please wait...";
+
+    try {
+
+      const response = await fetch(
+        SUPABASE_URL +
+        "/auth/v1/token?grant_type=password",
+        {
+          method: "POST",
+
+          headers: {
+            "apikey": SUPABASE_KEY,
+            "Content-Type": "application/json"
+          },
+
+          body: JSON.stringify({
+            email: email,
+            password: password
+          })
+        }
+      );
+
+      const data =
+        await response.json();
+
+      console.log(
+        "Supabase login response:",
+        data
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          data.error_description ||
+          data.msg ||
+          "Login failed."
+        );
       }
-    );
 
-    const data = await response.json();
+      if (!data.access_token) {
+        throw new Error(
+          "No login token was returned."
+        );
+      }
 
-    console.log("Supabase response:", data);
+      accessToken =
+        data.access_token;
 
-    if (!response.ok) {
-      throw new Error(
-        data.error_description ||
-        data.msg ||
-        "Login failed."
+      sessionStorage.setItem(
+        "chennai_access_token",
+        accessToken
       );
-    }
 
-    if (!data.access_token) {
-      throw new Error(
-        "No login token was returned."
+      loginMessage.textContent = "";
+
+      showApp();
+
+      console.log(
+        "LOGIN SUCCESSFUL"
       );
+
+    } catch (error) {
+
+      console.error(
+        "LOGIN ERROR:",
+        error
+      );
+
+      loginMessage.textContent =
+        error.message;
+
+    } finally {
+
+      loginButton.disabled = false;
+      loginButton.textContent = "Sign in";
+
     }
-
-    sessionStorage.setItem(
-      "chennai_access_token",
-      data.access_token
-    );
-
-    loginMessage.textContent = "";
-
-    showApp();
-
-    console.log("LOGIN SUCCESSFUL");
-
-  } catch (error) {
-
-    console.error("LOGIN ERROR:", error);
-
-    loginMessage.textContent =
-      error.message;
-
-  } finally {
-
-    loginButton.disabled = false;
-    loginButton.textContent = "Sign in";
 
   }
+);
 
-});
 
+/* =========================================================
+   SIGN OUT
+   ========================================================= */
 
-// Sign out
 const signOutButton =
   document.getElementById("sign-out");
 
@@ -128,6 +181,8 @@ if (signOutButton) {
   signOutButton.addEventListener(
     "click",
     function () {
+
+      accessToken = null;
 
       sessionStorage.removeItem(
         "chennai_access_token"
@@ -145,52 +200,672 @@ if (signOutButton) {
 }
 
 
-// Sidebar navigation
-document
-  .querySelectorAll(".nav-link")
-  .forEach(function (button) {
+/* =========================================================
+   LOAD PARTIES
+   ========================================================= */
 
-    button.addEventListener(
-      "click",
-      function () {
+async function loadParties() {
 
-        const pageName =
-          button.dataset.page;
+  const partyList =
+    document.getElementById("party-list");
 
-        document
-          .querySelectorAll(".page")
-          .forEach(function (page) {
+  if (!partyList) {
+    return;
+  }
 
-            page.classList.remove("active");
+  try {
 
-          });
+    const response = await fetch(
+      SUPABASE_URL +
+      "/rest/v1/parties?select=id,name&is_active=eq.true&order=name.asc",
+      {
+        method: "GET",
+        headers: supabaseHeaders()
+      }
+    );
 
-        const selectedPage =
-          document.getElementById(pageName);
+    if (!response.ok) {
 
-        if (selectedPage) {
-          selectedPage.classList.add("active");
-        }
+      const errorText =
+        await response.text();
 
-        document
-          .querySelectorAll(".nav-link")
-          .forEach(function (item) {
+      throw new Error(
+        "Could not load parties: " +
+        errorText
+      );
+    }
 
-            item.classList.remove("active");
+    const parties =
+      await response.json();
 
-          });
+    partyList.innerHTML = "";
 
-        button.classList.add("active");
+    parties.forEach(
+      function (party) {
+
+        const option =
+          document.createElement("option");
+
+        option.value =
+          party.name;
+
+        partyList.appendChild(
+          option
+        );
 
       }
     );
 
-  });
+    console.log(
+      "Parties loaded:",
+      parties.length
+    );
+
+  } catch (error) {
+
+    console.error(
+      "PARTY LOAD ERROR:",
+      error
+    );
+
+  }
+
+}
 
 
-// Receive goods button
+/* =========================================================
+   LOAD BRANCHES
+   ========================================================= */
+
+async function loadBranches() {
+
+  const branchList =
+    document.getElementById("branch-list");
+
+  if (!branchList) {
+    return;
+  }
+
+  try {
+
+    const response = await fetch(
+      SUPABASE_URL +
+      "/rest/v1/branches?select=id,name&is_active=eq.true&order=name.asc",
+      {
+        method: "GET",
+        headers: supabaseHeaders()
+      }
+    );
+
+    if (!response.ok) {
+
+      const errorText =
+        await response.text();
+
+      throw new Error(
+        "Could not load branches: " +
+        errorText
+      );
+    }
+
+    const branches =
+      await response.json();
+
+    branchList.innerHTML = "";
+
+    branches.forEach(
+      function (branch) {
+
+        const option =
+          document.createElement("option");
+
+        option.value =
+          branch.name;
+
+        branchList.appendChild(
+          option
+        );
+
+      }
+    );
+
+    console.log(
+      "Branches loaded:",
+      branches.length
+    );
+
+  } catch (error) {
+
+    console.error(
+      "BRANCH LOAD ERROR:",
+      error
+    );
+
+  }
+
+}
+
+
+/* =========================================================
+   FIND PARTY
+   ========================================================= */
+
+async function findPartyId(
+  partyName
+) {
+
+  const url =
+    SUPABASE_URL +
+    "/rest/v1/parties" +
+    "?select=id,name" +
+    "&name=eq." +
+    encodeURIComponent(partyName) +
+    "&is_active=eq.true" +
+    "&limit=1";
+
+  const response =
+    await fetch(
+      url,
+      {
+        method: "GET",
+        headers: supabaseHeaders()
+      }
+    );
+
+  const data =
+    await response.json();
+
+  if (!response.ok) {
+
+    console.error(
+      "Party lookup error:",
+      data
+    );
+
+    throw new Error(
+      "Could not find party."
+    );
+  }
+
+  if (!data.length) {
+
+    throw new Error(
+      "Party not found. Please select an existing party."
+    );
+  }
+
+  return data[0].id;
+}
+
+
+/* =========================================================
+   FIND BRANCH
+   ========================================================= */
+
+async function findBranchId(
+  branchName
+) {
+
+  const url =
+    SUPABASE_URL +
+    "/rest/v1/branches" +
+    "?select=id,name" +
+    "&name=eq." +
+    encodeURIComponent(branchName) +
+    "&is_active=eq.true" +
+    "&limit=1";
+
+  const response =
+    await fetch(
+      url,
+      {
+        method: "GET",
+        headers: supabaseHeaders()
+      }
+    );
+
+  const data =
+    await response.json();
+
+  if (!response.ok) {
+
+    console.error(
+      "Branch lookup error:",
+      data
+    );
+
+    throw new Error(
+      "Could not find branch."
+    );
+  }
+
+  if (!data.length) {
+
+    throw new Error(
+      "Branch not found. Please select an existing branch."
+    );
+  }
+
+  return data[0].id;
+}
+
+
+/* =========================================================
+   SAVE SHIPMENT
+   ========================================================= */
+
+async function saveShipment() {
+
+  const receivedDate =
+    document.getElementById(
+      "received-date"
+    ).value;
+
+  const lrNumber =
+    document.getElementById(
+      "lr-number"
+    ).value
+    .trim();
+
+  const partyName =
+    document.getElementById(
+      "party-name"
+    ).value
+    .trim();
+
+  const branchName =
+    document.getElementById(
+      "branch-name"
+    ).value
+    .trim();
+
+  const quantity =
+    document.getElementById(
+      "quantity"
+    ).value;
+
+  const amount =
+    document.getElementById(
+      "amount"
+    ).value;
+
+  const paymentType =
+    document.getElementById(
+      "payment-type"
+    ).value;
+
+  const remarks =
+    document.getElementById(
+      "remarks"
+    ).value
+    .trim();
+
+
+  /* VALIDATION */
+
+  if (!receivedDate) {
+    throw new Error(
+      "Please select the received date."
+    );
+  }
+
+  if (!lrNumber) {
+    throw new Error(
+      "Please enter the LR number."
+    );
+  }
+
+  if (!partyName) {
+    throw new Error(
+      "Please select a party."
+    );
+  }
+
+  if (!branchName) {
+    throw new Error(
+      "Please select the from branch."
+    );
+  }
+
+  if (
+    !quantity ||
+    Number(quantity) <= 0
+  ) {
+    throw new Error(
+      "Quantity must be greater than zero."
+    );
+  }
+
+  if (
+    amount === "" ||
+    Number(amount) < 0
+  ) {
+    throw new Error(
+      "Amount cannot be negative."
+    );
+  }
+
+  if (
+    ![
+      "TOPAY",
+      "TBB",
+      "PAID"
+    ].includes(paymentType)
+  ) {
+    throw new Error(
+      "Invalid payment type."
+    );
+  }
+
+
+  /* FIND FOREIGN KEYS */
+
+  const partyId =
+    await findPartyId(
+      partyName
+    );
+
+  const branchId =
+    await findBranchId(
+      branchName
+    );
+
+
+  /* SAVE SHIPMENT */
+
+  const shipmentResponse =
+    await fetch(
+      SUPABASE_URL +
+      "/rest/v1/shipments",
+      {
+        method: "POST",
+
+        headers: {
+          ...supabaseHeaders(),
+          "Prefer":
+            "return=representation"
+        },
+
+        body: JSON.stringify({
+          received_date:
+            receivedDate,
+
+          lr_number:
+            lrNumber,
+
+          party_id:
+            partyId,
+
+          quantity:
+            Number(quantity),
+
+          amount:
+            Number(amount),
+
+          payment_type:
+            paymentType,
+
+          from_branch_id:
+            branchId,
+
+          delivery_date:
+            null,
+
+          accounts_date:
+            null,
+
+          remarks:
+            remarks || null
+        })
+      }
+    );
+
+
+  const shipmentData =
+    await shipmentResponse
+      .json();
+
+
+  if (!shipmentResponse.ok) {
+
+    console.error(
+      "SHIPMENT SAVE ERROR:",
+      shipmentData
+    );
+
+    throw new Error(
+      shipmentData.message ||
+      shipmentData.details ||
+      shipmentData.hint ||
+      shipmentData.error ||
+      "Supabase could not save the shipment."
+    );
+  }
+
+
+  if (
+    !Array.isArray(shipmentData) ||
+    !shipmentData.length
+  ) {
+
+    throw new Error(
+      "Shipment save response was empty."
+    );
+  }
+
+
+  const shipment =
+    shipmentData[0];
+
+
+  /* CREATE RECEIVED EVENT */
+
+  const eventResponse =
+    await fetch(
+      SUPABASE_URL +
+      "/rest/v1/shipment_events",
+      {
+        method: "POST",
+
+        headers: supabaseHeaders(),
+
+        body: JSON.stringify({
+          shipment_id:
+            shipment.id,
+
+          event_type:
+            "RECEIVED",
+
+          event_date:
+            receivedDate,
+
+          notes:
+            remarks || null
+        })
+      }
+    );
+
+
+  if (!eventResponse.ok) {
+
+    const eventError =
+      await eventResponse.text();
+
+    console.error(
+      "EVENT SAVE ERROR:",
+      eventError
+    );
+
+    throw new Error(
+      "Shipment was saved, but the RECEIVED event could not be recorded."
+    );
+  }
+
+
+  return shipment;
+}
+
+
+/* =========================================================
+   RECEIVE GOODS FORM
+   ========================================================= */
+
+if (shipmentForm) {
+
+  shipmentForm.addEventListener(
+    "submit",
+    async function (event) {
+
+      event.preventDefault();
+
+      const submitButton =
+        shipmentForm.querySelector(
+          'button[type="submit"]'
+        );
+
+      if (submitButton) {
+
+        submitButton.disabled =
+          true;
+
+        submitButton.textContent =
+          "Saving...";
+      }
+
+      if (formMessage) {
+
+        formMessage.textContent =
+          "Saving to cloud...";
+
+      }
+
+      try {
+
+        const shipment =
+          await saveShipment();
+
+        if (formMessage) {
+
+          formMessage.textContent =
+            "Saved successfully. LR " +
+            shipment.lr_number +
+            " has been recorded.";
+
+        }
+
+        shipmentForm.reset();
+
+        console.log(
+          "SHIPMENT SAVED SUCCESSFULLY:",
+          shipment
+        );
+
+      } catch (error) {
+
+        console.error(
+          "RECEIVE GOODS ERROR:",
+          error
+        );
+
+        if (formMessage) {
+
+          formMessage.textContent =
+            error.message;
+
+        }
+
+      } finally {
+
+        if (submitButton) {
+
+          submitButton.disabled =
+            false;
+
+          submitButton.textContent =
+            "Save goods receipt";
+
+        }
+
+      }
+
+    }
+  );
+
+}
+
+
+/* =========================================================
+   SIDEBAR NAVIGATION
+   ========================================================= */
+
+document
+  .querySelectorAll(".nav-link")
+  .forEach(
+    function (button) {
+
+      button.addEventListener(
+        "click",
+        function () {
+
+          const pageName =
+            button.dataset.page;
+
+          document
+            .querySelectorAll(".page")
+            .forEach(
+              function (page) {
+
+                page.classList.remove(
+                  "active"
+                );
+
+              }
+            );
+
+          const selectedPage =
+            document.getElementById(
+              pageName
+            );
+
+          if (selectedPage) {
+
+            selectedPage.classList.add(
+              "active"
+            );
+
+          }
+
+          document
+            .querySelectorAll(".nav-link")
+            .forEach(
+              function (item) {
+
+                item.classList.remove(
+                  "active"
+                );
+
+              }
+            );
+
+          button.classList.add(
+            "active"
+          );
+
+        }
+      );
+
+    }
+  );
+
+
+/* =========================================================
+   RECEIVE GOODS BUTTON
+   ========================================================= */
+
 const receiveButton =
-  document.getElementById("receive-button");
+  document.getElementById(
+    "receive-button"
+  );
 
 if (receiveButton) {
 
@@ -200,27 +875,53 @@ if (receiveButton) {
 
       document
         .querySelectorAll(".page")
-        .forEach(function (page) {
+        .forEach(
+          function (page) {
 
-          page.classList.remove("active");
+            page.classList.remove(
+              "active"
+            );
 
-        });
+          }
+        );
 
-      document
-        .getElementById("receive")
-        .classList.add("active");
+      const receivePage =
+        document.getElementById(
+          "receive"
+        );
+
+      if (receivePage) {
+
+        receivePage.classList.add(
+          "active"
+        );
+
+      }
 
       document
         .querySelectorAll(".nav-link")
-        .forEach(function (item) {
+        .forEach(
+          function (item) {
 
-          item.classList.remove("active");
+            item.classList.remove(
+              "active"
+            );
 
-        });
+          }
+        );
 
-      document
-        .querySelector('[data-page="receive"]')
-        .classList.add("active");
+      const receiveNav =
+        document.querySelector(
+          '[data-page="receive"]'
+        );
+
+      if (receiveNav) {
+
+        receiveNav.classList.add(
+          "active"
+        );
+
+      }
 
     }
   );
@@ -228,14 +929,16 @@ if (receiveButton) {
 }
 
 
-// Start
-const savedToken =
-  sessionStorage.getItem(
-    "chennai_access_token"
-  );
+/* =========================================================
+   START APPLICATION
+   ========================================================= */
 
-if (savedToken) {
+if (accessToken) {
+
   showApp();
+
 } else {
+
   showLogin();
+
 }
