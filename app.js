@@ -1005,29 +1005,17 @@ if (shipmentForm) {
       event.preventDefault();
 
 
-      const saveButton =
-        shipmentForm.querySelector(
-          'button[type="submit"]'
-        );
-
-
-      const message =
-        document.getElementById(
-          "form-message"
-        );
-
-
       const receivedDate =
         document.getElementById(
           "received-date"
-        )?.value;
+        ).value;
 
 
       const lrNumber =
         normalizeUppercase(
           document.getElementById(
             "lr-number"
-          )?.value
+          ).value
         );
 
 
@@ -1035,7 +1023,7 @@ if (shipmentForm) {
         normalizeUppercase(
           document.getElementById(
             "party-name"
-          )?.value
+          ).value
         );
 
 
@@ -1043,43 +1031,39 @@ if (shipmentForm) {
         normalizeUppercase(
           document.getElementById(
             "branch-name"
-          )?.value
+          ).value
         );
 
 
       const quantity =
         document.getElementById(
           "quantity"
-        )?.value;
+        ).value;
 
 
       const amount =
         document.getElementById(
           "amount"
-        )?.value;
+        ).value;
 
 
       const paymentType =
         document.getElementById(
           "payment-type"
-        )?.value;
+        ).value;
 
 
       const remarks =
         normalizeUppercase(
           document.getElementById(
             "remarks"
-          )?.value
+          ).value
         );
 
 
-      /* ---------------------------------------------------
-         VALIDATION
-         --------------------------------------------------- */
-
       if (!receivedDate) {
 
-        message.textContent =
+        formMessage.textContent =
           "PLEASE SELECT RECEIVED DATE.";
 
         return;
@@ -1089,7 +1073,7 @@ if (shipmentForm) {
 
       if (!lrNumber) {
 
-        message.textContent =
+        formMessage.textContent =
           "PLEASE ENTER LR NUMBER.";
 
         return;
@@ -1099,7 +1083,7 @@ if (shipmentForm) {
 
       if (!partyName) {
 
-        message.textContent =
+        formMessage.textContent =
           "PLEASE ENTER PARTY NAME.";
 
         return;
@@ -1109,7 +1093,7 @@ if (shipmentForm) {
 
       if (!branchName) {
 
-        message.textContent =
+        formMessage.textContent =
           "PLEASE ENTER FROM BRANCH.";
 
         return;
@@ -1122,7 +1106,7 @@ if (shipmentForm) {
         Number(quantity) <= 0
       ) {
 
-        message.textContent =
+        formMessage.textContent =
           "PLEASE ENTER A VALID QUANTITY.";
 
         return;
@@ -1135,7 +1119,7 @@ if (shipmentForm) {
         Number(amount) < 0
       ) {
 
-        message.textContent =
+        formMessage.textContent =
           "PLEASE ENTER A VALID AMOUNT.";
 
         return;
@@ -1151,8 +1135,8 @@ if (shipmentForm) {
         ].includes(paymentType)
       ) {
 
-        message.textContent =
-          "PLEASE SELECT TOPAY, TBB OR PAID.";
+        formMessage.textContent =
+          "PLEASE SELECT A VALID PAYMENT TYPE.";
 
         return;
 
@@ -1167,7 +1151,7 @@ if (shipmentForm) {
 
       if (!token) {
 
-        message.textContent =
+        formMessage.textContent =
           "YOUR LOGIN SESSION HAS EXPIRED. PLEASE SIGN IN AGAIN.";
 
         showLogin();
@@ -1177,114 +1161,39 @@ if (shipmentForm) {
       }
 
 
-      if (saveButton) {
-
-        saveButton.disabled =
-          true;
-
-        saveButton.textContent =
-          "SAVING...";
-
-      }
+      const saveButton =
+        shipmentForm.querySelector(
+          'button[type="submit"]'
+        );
 
 
-      message.textContent =
+      saveButton.disabled =
+        true;
+
+
+      saveButton.textContent =
+        "SAVING...";
+
+
+      formMessage.textContent =
         "SAVING GOODS RECEIPT...";
 
 
       try {
 
-        /* -------------------------------------------------
-           FIND OR CREATE PARTY
-           ------------------------------------------------- */
-
-        let party;
-
-        try {
-
-          party =
-            await findPartyId(
-              partyName
-            );
-
-        } catch {
-
-          const create =
-            confirm(
-              "PARTY \"" +
-              partyName +
-              "\" DOES NOT EXIST.\n\n" +
-              "CREATE THIS PARTY?"
-            );
+        const partyId =
+          await findPartyId(
+            partyName
+          );
 
 
-          if (!create) {
-            throw new Error(
-              "PARTY NOT CREATED."
-            );
-          }
+        const branchId =
+          await findBranchId(
+            branchName
+          );
 
 
-          const newParty =
-            await createParty(
-              partyName
-            );
-
-
-          party =
-            newParty.id;
-
-        }
-
-
-        /* -------------------------------------------------
-           FIND OR CREATE BRANCH
-           ------------------------------------------------- */
-
-        let branch;
-
-        try {
-
-          branch =
-            await findBranchId(
-              branchName
-            );
-
-        } catch {
-
-          const create =
-            confirm(
-              "BRANCH \"" +
-              branchName +
-              "\" DOES NOT EXIST.\n\n" +
-              "CREATE THIS BRANCH?"
-            );
-
-
-          if (!create) {
-            throw new Error(
-              "BRANCH NOT CREATED."
-            );
-          }
-
-
-          const newBranch =
-            await createBranch(
-              branchName
-            );
-
-
-          branch =
-            newBranch.id;
-
-        }
-
-
-        /* -------------------------------------------------
-           SAVE SHIPMENT
-           ------------------------------------------------- */
-
-        const shipment =
+        const data =
           await api(
             "/rest/v1/shipments",
             {
@@ -1305,7 +1214,7 @@ if (shipmentForm) {
                     lrNumber,
 
                   party_id:
-                    party,
+                    partyId,
 
                   quantity:
                     Number(quantity),
@@ -1317,7 +1226,7 @@ if (shipmentForm) {
                     paymentType,
 
                   from_branch_id:
-                    branch,
+                    branchId,
 
                   delivery_date:
                     null,
@@ -1333,13 +1242,26 @@ if (shipmentForm) {
           );
 
 
-        const savedShipment =
-          shipment[0];
+        if (
+          !data ||
+          !Array.isArray(data) ||
+          !data.length
+        ) {
+
+          throw new Error(
+            "SAVE RESPONSE WAS EMPTY. PLEASE CHECK SUPABASE."
+          );
+
+        }
 
 
-        /* -------------------------------------------------
-           RECEIVED EVENT
-           ------------------------------------------------- */
+        const shipment =
+          data[0];
+
+
+        /*
+         * RECEIVED EVENT
+         */
 
         try {
 
@@ -1352,7 +1274,7 @@ if (shipmentForm) {
                 JSON.stringify({
 
                   shipment_id:
-                    savedShipment.id,
+                    shipment.id,
 
                   event_type:
                     "RECEIVED",
@@ -1370,27 +1292,22 @@ if (shipmentForm) {
         } catch (eventError) {
 
           console.warn(
-            "EVENT COULD NOT BE SAVED:",
+            "RECEIVED EVENT ERROR:",
             eventError
           );
 
         }
 
 
-        message.textContent =
-          "RECEIVE GOODS SAVED SUCCESSFULLY.";
+        formMessage.textContent =
+          "RECEIVE GOODS SAVED SUCCESSFULLY — SERIAL NO. " +
+          shipment.serial_no;
 
 
         shipmentForm.reset();
 
 
         await loadAllData();
-
-
-        console.log(
-          "SHIPMENT SAVED:",
-          savedShipment
-        );
 
 
       } catch (error) {
@@ -1401,78 +1318,25 @@ if (shipmentForm) {
         );
 
 
-        message.textContent =
+        formMessage.textContent =
           String(
-            error.message
+            error.message ||
+            "ERROR SAVING GOODS RECEIPT."
           ).toUpperCase();
 
 
       } finally {
 
-        if (saveButton) {
+        saveButton.disabled =
+          false;
 
-          saveButton.disabled =
-            false;
-
-          saveButton.textContent =
-            "SAVE GOODS RECEIPT";
-
-        }
+        saveButton.textContent =
+          "SAVE GOODS RECEIPT";
 
       }
 
     }
   );
-
-}
-
-
-/* =========================================================
-   LOAD SHIPMENTS
-   IMPORTANT:
-   parties uses `name`
-   branches uses `name`
-   ========================================================= */
-
-async function loadShipments() {
-
-  try {
-
-    const shipments =
-      await api(
-        "/rest/v1/shipments" +
-        "?select=*," +
-        "parties(id,name,phone)," +
-        "branches(id,name)" +
-        "&order=created_at.desc" +
-        "&limit=5000"
-      );
-
-
-    window.allShipments =
-      shipments || [];
-
-
-    console.log(
-      "SHIPMENTS LOADED:",
-      window.allShipments.length
-    );
-
-
-    return window.allShipments;
-
-
-  } catch (error) {
-
-    console.error(
-      "SHIPMENTS LOAD FAILED:",
-      error
-    );
-
-
-    throw error;
-
-  }
 
 }
 
@@ -1486,16 +1350,24 @@ function getShipmentStatus(
 ) {
 
   if (
+    shipment.accounts_date
+  ) {
+
+    return "ACCOUNTS COMPLETED";
+
+  }
+
+
+  if (
     shipment.delivery_date
   ) {
 
     if (
       shipment.payment_type ===
-      "TOPAY" &&
-      !shipment.accounts_date
+      "TOPAY"
     ) {
 
-      return "ACCOUNTS PENDING";
+      return "DELIVERED - ACCOUNTS PENDING";
 
     }
 
@@ -1511,127 +1383,7 @@ function getShipmentStatus(
 
 
 /* =========================================================
-   DASHBOARD
-   ========================================================= */
-
-async function loadDashboard() {
-
-  const shipments =
-    window.allShipments || [];
-
-
-  const today =
-    new Date()
-      .toISOString()
-      .slice(0, 10);
-
-
-  const receivedToday =
-    shipments.filter(
-      shipment =>
-        shipment.received_date ===
-        today
-    ).length;
-
-
-  const pendingDelivery =
-    shipments.filter(
-      shipment =>
-        !shipment.delivery_date
-    ).length;
-
-
-  /*
-   * IMPORTANT:
-   * ONLY TOPAY + DELIVERED + NOT ACCOUNTS
-   */
-
-  const accountsPending =
-    shipments.filter(
-      shipment =>
-        shipment.payment_type ===
-          "TOPAY" &&
-        shipment.delivery_date &&
-        !shipment.accounts_date
-    ).length;
-
-
-  const completedToday =
-    shipments.filter(
-      shipment =>
-        shipment.delivery_date ===
-        today
-    ).length;
-
-
-  setText(
-    "stat-received",
-    receivedToday
-  );
-
-
-  setText(
-    "stat-delivery",
-    pendingDelivery
-  );
-
-
-  setText(
-    "stat-accounts",
-    accountsPending
-  );
-
-
-  setText(
-    "stat-completed",
-    completedToday
-  );
-
-
-  setText(
-    "delivery-count",
-    pendingDelivery
-  );
-
-
-  setText(
-    "accounts-count",
-    accountsPending
-  );
-
-
-  renderRecentTable(
-    shipments.slice(0, 10)
-  );
-
-}
-
-
-/* =========================================================
-   SET TEXT
-   ========================================================= */
-
-function setText(
-  id,
-  value
-) {
-
-  const element =
-    document.getElementById(id);
-
-
-  if (element) {
-
-    element.textContent =
-      value;
-
-  }
-
-}
-
-
-/* =========================================================
-   SHIPMENT PARTY NAME
+   PARTY NAME
    ========================================================= */
 
 function partyName(
@@ -1640,15 +1392,16 @@ function partyName(
 
   return (
     shipment.parties?.name ||
+    shipment.party?.name ||
     shipment.party_name ||
-    "UNKNOWN PARTY"
+    "-"
   );
 
 }
 
 
 /* =========================================================
-   SHIPMENT BRANCH NAME
+   BRANCH NAME
    ========================================================= */
 
 function branchName(
@@ -1657,8 +1410,9 @@ function branchName(
 
   return (
     shipment.branches?.name ||
+    shipment.branch?.name ||
     shipment.branch_name ||
-    "UNKNOWN BRANCH"
+    "-"
   );
 
 }
@@ -1669,28 +1423,34 @@ function branchName(
    ========================================================= */
 
 function paymentLabel(
-  payment
+  type
 ) {
 
-  if (payment === "TOPAY") {
-    return "TOPAY";
-  }
+  const labels = {
 
-  if (payment === "TBB") {
-    return "TBB";
-  }
+    TOPAY:
+      "TOPAY",
 
-  if (payment === "PAID") {
-    return "PAID";
-  }
+    TBB:
+      "TBB",
 
-  return payment || "-";
+    PAID:
+      "PAID"
+
+  };
+
+
+  return (
+    labels[type] ||
+    type ||
+    "-"
+  );
 
 }
 
 
 /* =========================================================
-   TABLE
+   SHIPMENT TABLE
    ========================================================= */
 
 function shipmentTable(
@@ -1705,7 +1465,10 @@ function shipmentTable(
 
     return `
       <p class="empty">
-        ${escapeHtml(emptyMessage)}
+        ${escapeHtml(
+          emptyMessage ||
+          "NO SHIPMENTS FOUND."
+        )}
       </p>
     `;
 
@@ -1714,33 +1477,53 @@ function shipmentTable(
 
   let html = `
 
-    <div class="table-wrapper">
+    <div class="table-scroll">
 
-      <table>
+      <table class="data-table">
 
         <thead>
 
           <tr>
 
-            <th>SL NO</th>
+            <th>
+              SERIAL
+            </th>
 
-            <th>LR NUMBER</th>
+            <th>
+              LR NUMBER
+            </th>
 
-            <th>RECEIVED</th>
+            <th>
+              RECEIVED
+            </th>
 
-            <th>PARTY</th>
+            <th>
+              PARTY
+            </th>
 
-            <th>FROM BRANCH</th>
+            <th>
+              FROM BRANCH
+            </th>
 
-            <th>QTY</th>
+            <th>
+              QTY
+            </th>
 
-            <th>AMOUNT</th>
+            <th>
+              AMOUNT
+            </th>
 
-            <th>PAYMENT</th>
+            <th>
+              PAYMENT
+            </th>
 
-            <th>STATUS</th>
+            <th>
+              STATUS
+            </th>
 
-            <th>ACTION</th>
+            <th>
+              ACTION
+            </th>
 
           </tr>
 
@@ -1823,93 +1606,80 @@ function shipmentTable(
             )}
           </td>
 
-          <td class="shipment-actions">
+          <td>
 
-  <!-- EDIT -->
-  <button
-    type="button"
-    class="small-button"
-    data-action="edit"
-    data-id="${escapeHtml(
-      shipment.id
-    )}"
-  >
-    EDIT
-  </button>
+            ${
+              !shipment.delivery_date
+                ? `
+                  <button
+                    class="small-button"
+                    data-action="delivery"
+                    data-id="${escapeHtml(
+                      shipment.id
+                    )}"
+                  >
+                    DELIVER
+                  </button>
+                `
+                : ""
+            }
 
+            ${
+              shipment.delivery_date &&
+              shipment.payment_type ===
+                "TOPAY" &&
+              !shipment.accounts_date
+                ? `
+                  <button
+                    class="small-button"
+                    data-action="accounts"
+                    data-id="${escapeHtml(
+                      shipment.id
+                    )}"
+                  >
+                    ACCOUNTS
+                  </button>
+                `
+                : ""
+            }
 
-  <!-- DELETE -->
-  <button
-    type="button"
-    class="small-button danger-button"
-    data-action="delete"
-    data-id="${escapeHtml(
-      shipment.id
-    )}"
-  >
-    DELETE
-  </button>
+            <button
+              class="small-button"
+              data-action="edit"
+              data-id="${escapeHtml(
+                shipment.id
+              )}"
+            >
+              EDIT
+            </button>
 
+            <button
+              class="small-button"
+              data-action="delete"
+              data-id="${escapeHtml(
+                shipment.id
+              )}"
+            >
+              DELETE
+            </button>
 
-  <!-- NOT DELIVERED -->
-  ${
-    !shipment.delivery_date
-      ? `
-        <button
-          type="button"
-          class="small-button"
-          data-action="delivery"
-          data-id="${escapeHtml(
-            shipment.id
-          )}"
-        >
-          DELIVER
-        </button>
-      `
-      : ""
-  }
+            ${
+              shipment.delivery_date
+                ? `
+                  <button
+                    class="small-button"
+                    data-action="undeliver"
+                    data-id="${escapeHtml(
+                      shipment.id
+                    )}"
+                  >
+                    UNDELIVER
+                  </button>
+                `
+                : ""
+            }
 
-
-  <!-- DELIVERED TOPAY -->
-  ${
-    shipment.delivery_date &&
-    shipment.payment_type === "TOPAY" &&
-    !shipment.accounts_date
-      ? `
-        <button
-          type="button"
-          class="small-button"
-          data-action="accounts"
-          data-id="${escapeHtml(
-            shipment.id
-          )}"
-        >
-          ACCOUNTS
-        </button>
-      `
-      : ""
-  }
-
-
-  <!-- UNDELIVER -->
-  ${
-    shipment.delivery_date
-      ? `
-        <button
-          type="button"
-          class="small-button"
-          data-action="undeliver"
-          data-id="${escapeHtml(
-            shipment.id
-          )}"
-        >
-          UNDELIVER
-        </button>
-      `
-      : ""
-  }
-
-</td>
+          </td>
 
         </tr>
 
@@ -1964,6 +1734,166 @@ function renderRecentTable(
 
 
 /* =========================================================
+   DASHBOARD
+   ========================================================= */
+
+async function loadDashboard() {
+
+  const shipments =
+    window.allShipments ||
+    [];
+
+
+  const today =
+    new Date()
+      .toISOString()
+      .slice(0, 10);
+
+
+  const receivedToday =
+    shipments.filter(
+      shipment =>
+        shipment.received_date ===
+        today
+    ).length;
+
+
+  const pendingDelivery =
+    shipments.filter(
+      shipment =>
+        !shipment.delivery_date
+    ).length;
+
+
+  const accountsPending =
+    shipments.filter(
+      shipment =>
+        shipment.payment_type ===
+          "TOPAY" &&
+        shipment.delivery_date &&
+        !shipment.accounts_date
+    ).length;
+
+
+  const completedToday =
+    shipments.filter(
+      shipment => {
+
+        if (
+          shipment.payment_type ===
+          "TOPAY"
+        ) {
+
+          return (
+            shipment.accounts_date ===
+            today
+          );
+
+        }
+
+
+        return (
+          shipment.delivery_date ===
+          today
+        );
+
+      }
+    ).length;
+
+
+  const receivedElement =
+    document.getElementById(
+      "stat-received"
+    );
+
+
+  const deliveryElement =
+    document.getElementById(
+      "stat-delivery"
+    );
+
+
+  const accountsElement =
+    document.getElementById(
+      "stat-accounts"
+    );
+
+
+  const completedElement =
+    document.getElementById(
+      "stat-completed"
+    );
+
+
+  if (receivedElement) {
+
+    receivedElement.textContent =
+      receivedToday;
+
+  }
+
+
+  if (deliveryElement) {
+
+    deliveryElement.textContent =
+      pendingDelivery;
+
+  }
+
+
+  if (accountsElement) {
+
+    accountsElement.textContent =
+      accountsPending;
+
+  }
+
+
+  if (completedElement) {
+
+    completedElement.textContent =
+      completedToday;
+
+  }
+
+
+  renderRecentTable(
+    shipments.slice(
+      0,
+      10
+    )
+  );
+
+}
+
+
+/* =========================================================
+   LOAD SHIPMENTS
+   ========================================================= */
+
+async function loadShipments() {
+
+  const data =
+    await api(
+      "/rest/v1/shipments" +
+      "?select=*" +
+      "&order=created_at.desc" +
+      "&limit=5000"
+    );
+
+
+  window.allShipments =
+    data || [];
+
+
+  return (
+    window.allShipments
+  );
+
+}
+
+
+/* =========================================================
    DELIVERY TABLE
    ========================================================= */
 
@@ -1983,7 +1913,7 @@ function renderDeliveryTable(
 
 
   const pending =
-    shipments.filter(
+    (shipments || []).filter(
       shipment =>
         !shipment.delivery_date
     );
@@ -1992,7 +1922,7 @@ function renderDeliveryTable(
   container.innerHTML =
     shipmentTable(
       pending,
-      "NO GOODS ARE CURRENTLY PENDING DELIVERY."
+      "NO SHIPMENTS PENDING DELIVERY."
     );
 
 }
@@ -2000,7 +1930,6 @@ function renderDeliveryTable(
 
 /* =========================================================
    ACCOUNTS TABLE
-   ONLY TOPAY
    ========================================================= */
 
 function renderAccountsTable(
@@ -2018,8 +1947,8 @@ function renderAccountsTable(
   }
 
 
-  const accounts =
-    shipments.filter(
+  const pending =
+    (shipments || []).filter(
       shipment =>
         shipment.payment_type ===
           "TOPAY" &&
@@ -2030,15 +1959,15 @@ function renderAccountsTable(
 
   container.innerHTML =
     shipmentTable(
-      accounts,
-      "NO TOPAY SHIPMENTS ARE PENDING IN ACCOUNTS."
+      pending,
+      "NO TOPAY SHIPMENTS PENDING ACCOUNTS."
     );
 
 }
 
 
 /* =========================================================
-   ALL SHIPMENTS
+   ALL SHIPMENTS TABLE
    ========================================================= */
 
 function renderAllTable(
@@ -2218,6 +2147,7 @@ async function markDelivered(
             delivery_date:
               today
           })
+
       }
     );
 
@@ -2287,358 +2217,7 @@ async function markDelivered(
   }
 
 }
-/* =========================================================
-   EDIT SHIPMENT
-   ========================================================= */
 
-async function editShipment(shipment) {
-
-  const newLR =
-    prompt("EDIT LR NUMBER:", shipment.lr_number || "");
-
-  if (newLR === null) {
-    return;
-  }
-
-  const lrNumber =
-    normalizeUppercase(newLR);
-
-  if (!lrNumber) {
-    alert("LR NUMBER CANNOT BE EMPTY.");
-    return;
-  }
-
-  const newQuantity =
-    prompt(
-      "EDIT QUANTITY:",
-      shipment.quantity ?? ""
-    );
-
-  if (newQuantity === null) {
-    return;
-  }
-
-  const quantity =
-    Number(newQuantity);
-
-  if (!Number.isInteger(quantity) || quantity <= 0) {
-    alert("PLEASE ENTER A VALID QUANTITY.");
-    return;
-  }
-
-  const newAmount =
-    prompt(
-      "EDIT AMOUNT:",
-      shipment.amount ?? ""
-    );
-
-  if (newAmount === null) {
-    return;
-  }
-
-  const amount =
-    Number(newAmount);
-
-  if (Number.isNaN(amount) || amount < 0) {
-    alert("PLEASE ENTER A VALID AMOUNT.");
-    return;
-  }
-
-  const newRemarks =
-    prompt(
-      "EDIT REMARKS:",
-      shipment.remarks || ""
-    );
-
-  if (newRemarks === null) {
-    return;
-  }
-
-  const token =
-    sessionStorage.getItem(
-      "chennai_access_token"
-    );
-
-  if (!token) {
-    alert(
-      "YOUR LOGIN SESSION HAS EXPIRED. PLEASE SIGN IN AGAIN."
-    );
-    showLogin();
-    return;
-  }
-
-  try {
-
-    const response =
-      await fetch(
-        SUPABASE_URL +
-        "/rest/v1/shipments?id=eq." +
-        encodeURIComponent(shipment.id),
-        {
-          method: "PATCH",
-
-          headers: {
-            "apikey": SUPABASE_KEY,
-
-            "Authorization":
-              "Bearer " + token,
-
-            "Content-Type":
-              "application/json",
-
-            "Prefer":
-              "return=representation"
-          },
-
-          body: JSON.stringify({
-
-            lr_number:
-              lrNumber,
-
-            quantity:
-              quantity,
-
-            amount:
-              amount,
-
-            remarks:
-              normalizeUppercase(
-                newRemarks
-              ) || null
-
-          })
-        }
-      );
-
-    const data =
-      await response.json();
-
-    if (!response.ok) {
-
-      console.error(
-        "EDIT ERROR:",
-        data
-      );
-
-      throw new Error(
-        data.message ||
-        data.details ||
-        "UNABLE TO EDIT SHIPMENT."
-      );
-    }
-
-    alert(
-      "SHIPMENT UPDATED SUCCESSFULLY."
-    );
-
-    await load();
-
-  } catch (error) {
-
-    console.error(
-      "EDIT SHIPMENT ERROR:",
-      error
-    );
-
-    alert(
-      error.message ||
-      "ERROR UPDATING SHIPMENT."
-    );
-  }
-}
-
-
-/* =========================================================
-   DELETE SHIPMENT
-   ========================================================= */
-
-async function deleteShipment(shipment) {
-
-  const confirmed =
-    confirm(
-      "DELETE SHIPMENT?\n\n" +
-      "LR: " +
-      (shipment.lr_number || "") +
-      "\n\nTHIS ACTION CANNOT BE UNDONE."
-    );
-
-  if (!confirmed) {
-    return;
-  }
-
-  const token =
-    sessionStorage.getItem(
-      "chennai_access_token"
-    );
-
-  if (!token) {
-    alert(
-      "YOUR LOGIN SESSION HAS EXPIRED. PLEASE SIGN IN AGAIN."
-    );
-    showLogin();
-    return;
-  }
-
-  try {
-
-    const response =
-      await fetch(
-        SUPABASE_URL +
-        "/rest/v1/shipments?id=eq." +
-        encodeURIComponent(shipment.id),
-        {
-          method: "DELETE",
-
-          headers: {
-            "apikey": SUPABASE_KEY,
-
-            "Authorization":
-              "Bearer " + token
-          }
-        }
-      );
-
-    if (!response.ok) {
-
-      const error =
-        await response.json();
-
-      console.error(
-        "DELETE ERROR:",
-        error
-      );
-
-      throw new Error(
-        error.message ||
-        error.details ||
-        "UNABLE TO DELETE SHIPMENT."
-      );
-    }
-
-    alert(
-      "SHIPMENT DELETED SUCCESSFULLY."
-    );
-
-    await load();
-
-  } catch (error) {
-
-    console.error(
-      "DELETE SHIPMENT ERROR:",
-      error
-    );
-
-    alert(
-      error.message ||
-      "ERROR DELETING SHIPMENT."
-    );
-  }
-}
-
-
-/* =========================================================
-   UNDELIVER SHIPMENT
-   ========================================================= */
-
-async function undeliverShipment(shipment) {
-
-  const confirmed =
-    confirm(
-      "UNDELIVER THIS SHIPMENT?\n\n" +
-      "LR: " +
-      (shipment.lr_number || "") +
-      "\n\n" +
-      "IT WILL MOVE BACK TO PENDING DELIVERY."
-    );
-
-  if (!confirmed) {
-    return;
-  }
-
-  const token =
-    sessionStorage.getItem(
-      "chennai_access_token"
-    );
-
-  if (!token) {
-    alert(
-      "YOUR LOGIN SESSION HAS EXPIRED. PLEASE SIGN IN AGAIN."
-    );
-    showLogin();
-    return;
-  }
-
-  try {
-
-    const response =
-      await fetch(
-        SUPABASE_URL +
-        "/rest/v1/shipments?id=eq." +
-        encodeURIComponent(shipment.id),
-        {
-          method: "PATCH",
-
-          headers: {
-            "apikey": SUPABASE_KEY,
-
-            "Authorization":
-              "Bearer " + token,
-
-            "Content-Type":
-              "application/json",
-
-            "Prefer":
-              "return=representation"
-          },
-
-          body: JSON.stringify({
-
-            delivery_date:
-              null,
-
-            accounts_date:
-              null
-
-          })
-        }
-      );
-
-    const data =
-      await response.json();
-
-    if (!response.ok) {
-
-      console.error(
-        "UNDELIVER ERROR:",
-        data
-      );
-
-      throw new Error(
-        data.message ||
-        data.details ||
-        "UNABLE TO UNDELIVER SHIPMENT."
-      );
-    }
-
-    alert(
-      "SHIPMENT MOVED BACK TO PENDING DELIVERY."
-    );
-
-    await load();
-
-  } catch (error) {
-
-    console.error(
-      "UNDELIVER ERROR:",
-      error
-    );
-
-    alert(
-      error.message ||
-      "ERROR UNDELIVERING SHIPMENT."
-    );
-  }
-}
 
 /* =========================================================
    MARK ACCOUNTS COMPLETED
@@ -2725,6 +2304,7 @@ async function markAccountsCompleted(
             accounts_date:
               today
           })
+
       }
     );
 
@@ -2797,6 +2377,469 @@ async function markAccountsCompleted(
 
 
 /* =========================================================
+   EDIT SHIPMENT
+   ========================================================= */
+
+async function editShipment(
+  shipmentId
+) {
+
+  const shipment =
+    window.allShipments.find(
+      item =>
+        String(item.id) ===
+        String(shipmentId)
+    );
+
+
+  if (!shipment) {
+
+    alert(
+      "SHIPMENT NOT FOUND."
+    );
+
+    return;
+
+  }
+
+
+  const lrNumber =
+    prompt(
+      "LR NUMBER:",
+      shipment.lr_number ||
+      ""
+    );
+
+
+  if (lrNumber === null) {
+    return;
+  }
+
+
+  const receivedDate =
+    prompt(
+      "RECEIVED DATE (YYYY-MM-DD):",
+      shipment.received_date ||
+      ""
+    );
+
+
+  if (receivedDate === null) {
+    return;
+  }
+
+
+  const quantity =
+    prompt(
+      "QUANTITY:",
+      shipment.quantity ??
+      ""
+    );
+
+
+  if (quantity === null) {
+    return;
+  }
+
+
+  const amount =
+    prompt(
+      "AMOUNT:",
+      shipment.amount ??
+      ""
+    );
+
+
+  if (amount === null) {
+    return;
+  }
+
+
+  const paymentType =
+    prompt(
+      "PAYMENT TYPE (TOPAY / TBB / PAID):",
+      shipment.payment_type ||
+      "TOPAY"
+    );
+
+
+  if (paymentType === null) {
+    return;
+  }
+
+
+  const remarks =
+    prompt(
+      "REMARKS:",
+      shipment.remarks ||
+      ""
+    );
+
+
+  if (remarks === null) {
+    return;
+  }
+
+
+  const cleanPaymentType =
+    normalizeUppercase(
+      paymentType
+    );
+
+
+  if (
+    ![
+      "TOPAY",
+      "TBB",
+      "PAID"
+    ].includes(
+      cleanPaymentType
+    )
+  ) {
+
+    alert(
+      "PAYMENT TYPE MUST BE TOPAY, TBB OR PAID."
+    );
+
+    return;
+
+  }
+
+
+  if (!receivedDate) {
+
+    alert(
+      "RECEIVED DATE IS REQUIRED."
+    );
+
+    return;
+
+  }
+
+
+  if (!lrNumber.trim()) {
+
+    alert(
+      "LR NUMBER IS REQUIRED."
+    );
+
+    return;
+
+  }
+
+
+  if (
+    !quantity ||
+    Number(quantity) <= 0
+  ) {
+
+    alert(
+      "QUANTITY MUST BE GREATER THAN ZERO."
+    );
+
+    return;
+
+  }
+
+
+  if (
+    amount === "" ||
+    Number(amount) < 0
+  ) {
+
+    alert(
+      "AMOUNT CANNOT BE NEGATIVE."
+    );
+
+    return;
+
+  }
+
+
+  try {
+
+    await api(
+      "/rest/v1/shipments?id=eq." +
+      encodeURIComponent(
+        shipmentId
+      ),
+      {
+        method: "PATCH",
+
+        headers: {
+          "Prefer":
+            "return=representation"
+        },
+
+        body:
+          JSON.stringify({
+
+            lr_number:
+              normalizeUppercase(
+                lrNumber
+              ),
+
+            received_date:
+              receivedDate,
+
+            quantity:
+              Number(quantity),
+
+            amount:
+              Number(amount),
+
+            payment_type:
+              cleanPaymentType,
+
+            remarks:
+              normalizeUppercase(
+                remarks
+              ) || null
+
+          })
+
+      }
+    );
+
+
+    await loadAllData();
+
+
+    alert(
+      "SHIPMENT UPDATED SUCCESSFULLY."
+    );
+
+
+  } catch (error) {
+
+    console.error(
+      "EDIT SHIPMENT ERROR:",
+      error
+    );
+
+
+    alert(
+      String(
+        error.message ||
+        "UNABLE TO UPDATE SHIPMENT."
+      ).toUpperCase()
+    );
+
+  }
+
+}
+
+
+/* =========================================================
+   DELETE SHIPMENT
+   ========================================================= */
+
+async function deleteShipment(
+  shipmentId
+) {
+
+  const shipment =
+    window.allShipments.find(
+      item =>
+        String(item.id) ===
+        String(shipmentId)
+    );
+
+
+  if (!shipment) {
+
+    alert(
+      "SHIPMENT NOT FOUND."
+    );
+
+    return;
+
+  }
+
+
+  const confirmed =
+    confirm(
+      "DELETE LR " +
+      String(
+        shipment.lr_number ||
+        ""
+      ) +
+      "?\n\nTHIS CANNOT BE UNDONE."
+    );
+
+
+  if (!confirmed) {
+    return;
+  }
+
+
+  try {
+
+    await api(
+      "/rest/v1/shipment_events?shipment_id=eq." +
+      encodeURIComponent(
+        shipmentId
+      ),
+      {
+        method: "DELETE"
+      }
+    );
+
+
+    await api(
+      "/rest/v1/shipments?id=eq." +
+      encodeURIComponent(
+        shipmentId
+      ),
+      {
+        method: "DELETE"
+      }
+    );
+
+
+    await loadAllData();
+
+
+    alert(
+      "SHIPMENT DELETED SUCCESSFULLY."
+    );
+
+
+  } catch (error) {
+
+    console.error(
+      "DELETE SHIPMENT ERROR:",
+      error
+    );
+
+
+    alert(
+      String(
+        error.message ||
+        "UNABLE TO DELETE SHIPMENT."
+      ).toUpperCase()
+    );
+
+  }
+
+}
+
+
+/* =========================================================
+   UNDELIVER SHIPMENT
+   ========================================================= */
+
+async function undeliverShipment(
+  shipmentId
+) {
+
+  const shipment =
+    window.allShipments.find(
+      item =>
+        String(item.id) ===
+        String(shipmentId)
+    );
+
+
+  if (!shipment) {
+
+    alert(
+      "SHIPMENT NOT FOUND."
+    );
+
+    return;
+
+  }
+
+
+  if (
+    !shipment.delivery_date
+  ) {
+
+    alert(
+      "THIS SHIPMENT IS NOT DELIVERED."
+    );
+
+    return;
+
+  }
+
+
+  const confirmed =
+    confirm(
+      "UNDO DELIVERY FOR LR " +
+      String(
+        shipment.lr_number ||
+        ""
+      ) +
+      "?\n\nTHE SHIPMENT WILL RETURN TO DELIVERY."
+    );
+
+
+  if (!confirmed) {
+    return;
+  }
+
+
+  try {
+
+    await api(
+      "/rest/v1/shipments?id=eq." +
+      encodeURIComponent(
+        shipmentId
+      ),
+      {
+        method: "PATCH",
+
+        headers: {
+          "Prefer":
+            "return=representation"
+        },
+
+        body:
+          JSON.stringify({
+
+            delivery_date:
+              null,
+
+            accounts_date:
+              null
+
+          })
+
+      }
+    );
+
+
+    await loadAllData();
+
+
+    alert(
+      "DELIVERY UNDONE SUCCESSFULLY."
+    );
+
+
+  } catch (error) {
+
+    console.error(
+      "UNDELIVER ERROR:",
+      error
+    );
+
+
+    alert(
+      String(
+        error.message ||
+        "UNABLE TO UNDELIVER SHIPMENT."
+      ).toUpperCase()
+    );
+
+  }
+
+}
+
+
+/* =========================================================
    TABLE ACTIONS
    ========================================================= */
 
@@ -2825,79 +2868,43 @@ document.addEventListener(
 
     if (action === "delivery") {
 
-  await markDelivered(
-    id
-  );
+      await markDelivered(
+        id
+      );
 
-}
-
-
-if (action === "edit") {
-
-  const shipment =
-    shipments.find(
-      function (item) {
-        return item.id === id;
-      }
-    );
-
-  if (shipment) {
-
-    await editShipment(
-      shipment
-    );
-
-  }
-
-  return;
-}
-
-
-if (action === "delete") {
-
-  const shipment =
-    shipments.find(
-      function (item) {
-        return item.id === id;
-      }
-    );
-
-  if (shipment) {
-
-    await deleteShipment(
-      shipment
-    );
-
-  }
-
-  return;
-}
-
-
-if (action === "undeliver") {
-
-  const shipment =
-    shipments.find(
-      function (item) {
-        return item.id === id;
-      }
-    );
-
-  if (shipment) {
-
-    await undeliverShipment(
-      shipment
-    );
-
-  }
-
-  return;
-}
+    }
 
 
     if (action === "accounts") {
 
       await markAccountsCompleted(
+        id
+      );
+
+    }
+
+
+    if (action === "edit") {
+
+      await editShipment(
+        id
+      );
+
+    }
+
+
+    if (action === "delete") {
+
+      await deleteShipment(
+        id
+      );
+
+    }
+
+
+    if (action === "undeliver") {
+
+      await undeliverShipment(
         id
       );
 
@@ -2939,7 +2946,10 @@ function setupShipmentSearch() {
               [];
 
 
-            if (type === "delivery") {
+            if (
+              type ===
+              "delivery"
+            ) {
 
               source =
                 source.filter(
@@ -2950,7 +2960,10 @@ function setupShipmentSearch() {
             }
 
 
-            if (type === "accounts") {
+            if (
+              type ===
+              "accounts"
+            ) {
 
               source =
                 source.filter(
@@ -3039,7 +3052,10 @@ function renderSearchResult(
   shipments
 ) {
 
-  if (type === "delivery") {
+  if (
+    type ===
+    "delivery"
+  ) {
 
     const container =
       document.getElementById(
@@ -3060,7 +3076,10 @@ function renderSearchResult(
   }
 
 
-  if (type === "accounts") {
+  if (
+    type ===
+    "accounts"
+  ) {
 
     const container =
       document.getElementById(
@@ -3081,7 +3100,10 @@ function renderSearchResult(
   }
 
 
-  if (type === "all") {
+  if (
+    type ===
+    "all"
+  ) {
 
     const container =
       document.getElementById(
@@ -3197,15 +3219,24 @@ function showPage(
   };
 
 
-  setText(
-    "page-title",
-    titles[pageName] ||
-    "GOODS MANAGEMENT"
-  );
+  const pageTitle =
+    document.getElementById(
+      "page-title"
+    );
+
+
+  if (pageTitle) {
+
+    pageTitle.textContent =
+      titles[pageName] ||
+      "GOODS MANAGEMENT";
+
+  }
 
 
   if (
-    pageName === "dashboard"
+    pageName ===
+    "dashboard"
   ) {
 
     loadDashboard();
@@ -3214,44 +3245,52 @@ function showPage(
 
 
   if (
-    pageName === "delivery"
+    pageName ===
+    "delivery"
   ) {
 
     renderDeliveryTable(
-      window.allShipments || []
+      window.allShipments ||
+      []
     );
 
   }
 
 
   if (
-    pageName === "accounts"
+    pageName ===
+    "accounts"
   ) {
 
     renderAccountsTable(
-      window.allShipments || []
+      window.allShipments ||
+      []
     );
 
   }
 
 
   if (
-    pageName === "all"
+    pageName ===
+    "all"
   ) {
 
     renderAllTable(
-      window.allShipments || []
+      window.allShipments ||
+      []
     );
 
   }
 
 
   if (
-    pageName === "stock"
+    pageName ===
+    "stock"
   ) {
 
     renderStockTable(
-      window.allShipments || []
+      window.allShipments ||
+      []
     );
 
   }
@@ -3403,5 +3442,1427 @@ if (accessToken) {
 } else {
 
   showLogin();
+
+}
+/* =========================================================
+   DASHBOARD
+========================================================= */
+
+async function loadDashboard() {
+  try {
+    const shipments = await getShipments();
+
+    const today = new Date().toISOString().split("T")[0];
+
+    const receivedToday = shipments.filter(
+      s => s.received_date === today
+    ).length;
+
+    const pendingDelivery = shipments.filter(
+      s => !s.delivery_date
+    ).length;
+
+    /*
+     * ONLY TOPAY shipments which are delivered
+     * and accounts_date is still empty
+     * are accounts pending.
+     */
+    const accountsPending = shipments.filter(
+      s =>
+        s.payment_type === "TOPAY" &&
+        s.delivery_date &&
+        !s.accounts_date
+    ).length;
+
+    /*
+     * Cycle completed:
+     * shipment delivered AND accounts completed
+     *
+     * For PAID/TBB:
+     * delivered = completed
+     *
+     * For TOPAY:
+     * delivered + accounts completed = completed
+     */
+    const completedToday = shipments.filter(s => {
+      if (s.delivery_date !== today) {
+        return false;
+      }
+
+      if (s.payment_type === "TOPAY") {
+        return !!s.accounts_date;
+      }
+
+      return true;
+    }).length;
+
+
+    const receivedElement =
+      document.getElementById("stat-received");
+
+    const deliveryElement =
+      document.getElementById("stat-delivery");
+
+    const accountsElement =
+      document.getElementById("stat-accounts");
+
+    const completedElement =
+      document.getElementById("stat-completed");
+
+
+    if (receivedElement) {
+      receivedElement.textContent =
+        receivedToday;
+    }
+
+    if (deliveryElement) {
+      deliveryElement.textContent =
+        pendingDelivery;
+    }
+
+    if (accountsElement) {
+      accountsElement.textContent =
+        accountsPending;
+    }
+
+    if (completedElement) {
+      completedElement.textContent =
+        completedToday;
+    }
+
+
+    const deliveryCount =
+      document.getElementById("delivery-count");
+
+    const accountsCount =
+      document.getElementById("accounts-count");
+
+
+    if (deliveryCount) {
+      deliveryCount.textContent =
+        pendingDelivery > 0
+          ? pendingDelivery
+          : "";
+    }
+
+    if (accountsCount) {
+      accountsCount.textContent =
+        accountsPending > 0
+          ? accountsPending
+          : "";
+    }
+
+
+    renderRecentShipments(shipments);
+
+  } catch (error) {
+
+    console.error(
+      "DASHBOARD LOAD FAILED:",
+      error
+    );
+
+  }
+}
+
+
+/* =========================================================
+   RECENT SHIPMENTS
+========================================================= */
+
+function renderRecentShipments(shipments) {
+
+  const container =
+    document.getElementById("recent-table");
+
+  if (!container) {
+    return;
+  }
+
+
+  if (!shipments || shipments.length === 0) {
+
+    container.innerHTML =
+      '<p class="empty">No shipments found.</p>';
+
+    return;
+  }
+
+
+  const recent =
+    shipments.slice(0, 10);
+
+
+  container.innerHTML = "";
+
+
+  const wrapper =
+    document.createElement("div");
+
+  wrapper.className =
+    "table-responsive";
+
+
+  const table =
+    document.createElement("table");
+
+  table.className =
+    "data-table";
+
+
+  table.innerHTML = `
+    <thead>
+      <tr>
+        <th>LR No.</th>
+        <th>Party</th>
+        <th>From</th>
+        <th>Qty</th>
+        <th>Amount</th>
+        <th>Payment</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+  `;
+
+
+  const tbody =
+    document.createElement("tbody");
+
+
+  recent.forEach(function (shipment) {
+
+    const row =
+      document.createElement("tr");
+
+
+    const status =
+      getShipmentStatus(shipment);
+
+
+    row.innerHTML = `
+      <td>
+        <strong>
+          ${escapeHtml(
+            shipment.lr_number || "-"
+          )}
+        </strong>
+      </td>
+
+      <td>
+        ${escapeHtml(
+          shipment.parties?.name || "-"
+        )}
+      </td>
+
+      <td>
+        ${escapeHtml(
+          shipment.branches?.name || "-"
+        )}
+      </td>
+
+      <td>
+        ${escapeHtml(
+          String(shipment.quantity ?? "-")
+        )}
+      </td>
+
+      <td>
+        ₹${formatAmount(shipment.amount)}
+      </td>
+
+      <td>
+        ${paymentLabel(
+          shipment.payment_type
+        )}
+      </td>
+
+      <td>
+        ${statusBadge(status)}
+      </td>
+    `;
+
+
+    tbody.appendChild(row);
+
+  });
+
+
+  table.appendChild(tbody);
+
+  wrapper.appendChild(table);
+
+  container.appendChild(wrapper);
+}
+
+
+/* =========================================================
+   LOAD ALL SHIPMENTS
+========================================================= */
+
+async function loadShipments() {
+
+  try {
+
+    const shipments =
+      await getShipments();
+
+
+    renderDeliveryTable(
+      shipments
+    );
+
+    renderAccountsTable(
+      shipments
+    );
+
+    renderAllShipmentsTable(
+      shipments
+    );
+
+    renderStockTable(
+      shipments
+    );
+
+
+  } catch (error) {
+
+    console.error(
+      "SHIPMENTS LOAD FAILED:",
+      error
+    );
+
+  }
+}
+
+
+/* =========================================================
+   GET SHIPMENTS
+========================================================= */
+
+async function getShipments() {
+
+  const token =
+    sessionStorage.getItem(
+      "chennai_access_token"
+    );
+
+
+  if (!token) {
+
+    throw new Error(
+      "Login session expired."
+    );
+
+  }
+
+
+  const url =
+    SUPABASE_URL +
+    "/rest/v1/shipments" +
+    "?select=*" +
+    ",parties(id,name,phone)" +
+    ",branches(id,name)" +
+    "&order=created_at.desc";
+
+
+  const response =
+    await fetch(
+      url,
+      {
+        method: "GET",
+
+        headers: {
+          "apikey":
+            SUPABASE_KEY,
+
+          "Authorization":
+            "Bearer " + token,
+
+          "Content-Type":
+            "application/json"
+        }
+      }
+    );
+
+
+  const data =
+    await response.json();
+
+
+  if (!response.ok) {
+
+    console.error(
+      "GET SHIPMENTS ERROR:",
+      data
+    );
+
+
+    /*
+     * If token expired, send user
+     * back to login.
+     */
+    if (
+      response.status === 401 ||
+      response.status === 403
+    ) {
+
+      accessToken = null;
+
+      sessionStorage.removeItem(
+        "chennai_access_token"
+      );
+
+      showLogin();
+
+    }
+
+
+    throw new Error(
+      data.message ||
+      data.details ||
+      data.hint ||
+      "Could not load shipments."
+    );
+
+  }
+
+
+  return Array.isArray(data)
+    ? data
+    : [];
+}
+
+
+/* =========================================================
+   SHIPMENT STATUS
+========================================================= */
+
+function getShipmentStatus(shipment) {
+
+  /*
+   * TOPAY:
+   *
+   * Received
+   *    ↓
+   * Delivery
+   *    ↓
+   * Accounts
+   *    ↓
+   * Completed
+   */
+
+  if (
+    shipment.payment_type === "TOPAY"
+  ) {
+
+    if (
+      shipment.delivery_date &&
+      shipment.accounts_date
+    ) {
+
+      return "COMPLETED";
+
+    }
+
+
+    if (
+      shipment.delivery_date
+    ) {
+
+      return "ACCOUNTS PENDING";
+
+    }
+
+
+    return "DELIVERY PENDING";
+  }
+
+
+  /*
+   * PAID / TBB:
+   *
+   * Received
+   *    ↓
+   * Delivery
+   *    ↓
+   * Completed
+   */
+
+  if (
+    shipment.delivery_date
+  ) {
+
+    return "COMPLETED";
+
+  }
+
+
+  return "DELIVERY PENDING";
+}
+
+
+/* =========================================================
+   PAYMENT LABEL
+========================================================= */
+
+function paymentLabel(type) {
+
+  if (type === "TOPAY") {
+    return "To Pay";
+  }
+
+  if (type === "TBB") {
+    return "TBB";
+  }
+
+  if (type === "PAID") {
+    return "Paid";
+  }
+
+  if (type === "FOC") {
+    return "FOC";
+  }
+
+  return type || "-";
+}
+
+
+/* =========================================================
+   STATUS BADGE
+========================================================= */
+
+function statusBadge(status) {
+
+  let className =
+    "status-badge";
+
+
+  if (status === "COMPLETED") {
+
+    className +=
+      " status-completed";
+
+  } else if (
+    status === "ACCOUNTS PENDING"
+  ) {
+
+    className +=
+      " status-accounts";
+
+  } else {
+
+    className +=
+      " status-delivery";
+
+  }
+
+
+  return `
+    <span class="${className}">
+      ${escapeHtml(status)}
+    </span>
+  `;
+}
+
+
+/* =========================================================
+   FORMAT AMOUNT
+========================================================= */
+
+function formatAmount(amount) {
+
+  const number =
+    Number(amount);
+
+
+  if (
+    Number.isNaN(number)
+  ) {
+
+    return "0.00";
+
+  }
+
+
+  return number.toLocaleString(
+    "en-IN",
+    {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }
+  );
+}
+
+
+/* =========================================================
+   ESCAPE HTML
+========================================================= */
+
+function escapeHtml(value) {
+
+  if (
+    value === null ||
+    value === undefined
+  ) {
+
+    return "";
+
+  }
+
+
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+
+/* =========================================================
+   DELIVERY TABLE
+========================================================= */
+
+function renderDeliveryTable(
+  shipments
+) {
+
+  const container =
+    document.getElementById(
+      "delivery-table"
+    );
+
+
+  if (!container) {
+    return;
+  }
+
+
+  /*
+   * EVERYTHING NOT DELIVERED
+   * appears in Delivery.
+   */
+  const rows =
+    shipments.filter(
+      function (shipment) {
+
+        return !shipment.delivery_date;
+
+      }
+    );
+
+
+  renderShipmentTable(
+    container,
+    rows,
+    "delivery"
+  );
+}
+
+
+/* =========================================================
+   ACCOUNTS TABLE
+========================================================= */
+
+function renderAccountsTable(
+  shipments
+) {
+
+  const container =
+    document.getElementById(
+      "accounts-table"
+    );
+
+
+  if (!container) {
+    return;
+  }
+
+
+  /*
+   * IMPORTANT:
+   *
+   * ONLY TOPAY shipments
+   * move into Accounts.
+   *
+   * They must already be delivered.
+   *
+   * They must NOT already have
+   * accounts_date.
+   */
+  const rows =
+    shipments.filter(
+      function (shipment) {
+
+        return (
+          shipment.payment_type ===
+            "TOPAY" &&
+
+          !!shipment.delivery_date &&
+
+          !shipment.accounts_date
+        );
+
+      }
+    );
+
+
+  renderShipmentTable(
+    container,
+    rows,
+    "accounts"
+  );
+}
+
+
+/* =========================================================
+   ALL SHIPMENTS TABLE
+========================================================= */
+
+function renderAllShipmentsTable(
+  shipments
+) {
+
+  const container =
+    document.getElementById(
+      "all-table"
+    );
+
+
+  if (!container) {
+    return;
+  }
+
+
+  renderShipmentTable(
+    container,
+    shipments,
+    "all"
+  );
+}
+
+
+/* =========================================================
+   GENERIC SHIPMENT TABLE
+========================================================= */
+
+function renderShipmentTable(
+  container,
+  shipments,
+  mode
+) {
+
+  container.innerHTML = "";
+
+
+  if (
+    !shipments ||
+    shipments.length === 0
+  ) {
+
+    container.innerHTML =
+      '<p class="empty">No shipments found.</p>';
+
+    return;
+
+  }
+
+
+  const wrapper =
+    document.createElement("div");
+
+  wrapper.className =
+    "table-responsive";
+
+
+  const table =
+    document.createElement("table");
+
+  table.className =
+    "data-table";
+
+
+  const thead =
+    document.createElement("thead");
+
+
+  thead.innerHTML = `
+    <tr>
+
+      <th>LR No.</th>
+
+      <th>Received</th>
+
+      <th>Party</th>
+
+      <th>From Branch</th>
+
+      <th>Qty</th>
+
+      <th>Amount</th>
+
+      <th>Payment</th>
+
+      <th>Delivery</th>
+
+      <th>Accounts</th>
+
+      <th>Status</th>
+
+      <th>Action</th>
+
+    </tr>
+  `;
+
+
+  const tbody =
+    document.createElement("tbody");
+
+
+  shipments.forEach(
+    function (shipment) {
+
+      const row =
+        document.createElement("tr");
+
+
+      row.innerHTML = `
+        <td>
+          <strong>
+            ${escapeHtml(
+              shipment.lr_number || "-"
+            )}
+          </strong>
+        </td>
+
+        <td>
+          ${formatDate(
+            shipment.received_date
+          )}
+        </td>
+
+        <td>
+          ${escapeHtml(
+            shipment.parties?.name || "-"
+          )}
+        </td>
+
+        <td>
+          ${escapeHtml(
+            shipment.branches?.name || "-"
+          )}
+        </td>
+
+        <td>
+          ${escapeHtml(
+            String(
+              shipment.quantity ?? "-"
+            )
+          )}
+        </td>
+
+        <td>
+          ₹${formatAmount(
+            shipment.amount
+          )}
+        </td>
+
+        <td>
+          ${paymentLabel(
+            shipment.payment_type
+          )}
+        </td>
+
+        <td>
+          ${
+            shipment.delivery_date
+              ? formatDate(
+                  shipment.delivery_date
+                )
+              : "-"
+          }
+        </td>
+
+        <td>
+          ${
+            shipment.accounts_date
+              ? formatDate(
+                  shipment.accounts_date
+                )
+              : "-"
+          }
+        </td>
+
+        <td>
+          ${statusBadge(
+            getShipmentStatus(
+              shipment
+            )
+          )}
+        </td>
+
+        <td>
+          ${createActionButtons(
+            shipment,
+            mode
+          )}
+        </td>
+      `;
+
+
+      tbody.appendChild(row);
+
+    }
+  );
+
+
+  table.appendChild(thead);
+
+  table.appendChild(tbody);
+
+  wrapper.appendChild(table);
+
+  container.appendChild(wrapper);
+}
+
+
+/* =========================================================
+   DATE FORMAT
+========================================================= */
+
+function formatDate(date) {
+
+  if (!date) {
+    return "-";
+  }
+
+
+  const parts =
+    String(date).split("-");
+
+
+  if (
+    parts.length === 3
+  ) {
+
+    return (
+      parts[2] +
+      "/" +
+      parts[1] +
+      "/" +
+      parts[0]
+    );
+
+  }
+
+
+  return date;
+}
+
+
+/* =========================================================
+   ACTION BUTTONS
+========================================================= */
+
+function createActionButtons(
+  shipment,
+  mode
+) {
+
+  let html = "";
+
+
+  /*
+   * EDIT
+   */
+  html += `
+    <button
+      type="button"
+      class="table-action edit-action"
+      data-action="edit"
+      data-id="${shipment.id}"
+    >
+      Edit
+    </button>
+  `;
+
+
+  /*
+   * DELIVERY
+   *
+   * Show only when shipment
+   * has not been delivered.
+   */
+  if (!shipment.delivery_date) {
+
+    html += `
+      <button
+        type="button"
+        class="table-action delivery-action"
+        data-action="delivery"
+        data-id="${shipment.id}"
+      >
+        Delivered
+      </button>
+    `;
+
+  } else {
+
+    /*
+     * UNDELIVER
+     *
+     * Allows correction if goods
+     * were marked delivered by mistake.
+     */
+    html += `
+      <button
+        type="button"
+        class="table-action undeliver-action"
+        data-action="undeliver"
+        data-id="${shipment.id}"
+      >
+        Undeliver
+      </button>
+    `;
+
+  }
+
+
+  /*
+   * ACCOUNTS
+   *
+   * ONLY TOPAY shipments.
+   */
+  if (
+    shipment.payment_type === "TOPAY" &&
+    shipment.delivery_date &&
+    !shipment.accounts_date
+  ) {
+
+    html += `
+      <button
+        type="button"
+        class="table-action accounts-action"
+        data-action="accounts"
+        data-id="${shipment.id}"
+      >
+        Accounts Done
+      </button>
+    `;
+
+  }
+
+
+  /*
+   * DELETE
+   */
+  html += `
+    <button
+      type="button"
+      class="table-action delete-action"
+      data-action="delete"
+      data-id="${shipment.id}"
+    >
+      Delete
+    </button>
+  `;
+
+
+  return `
+    <div class="table-actions">
+      ${html}
+    </div>
+  `;
+}
+
+
+/* =========================================================
+   TABLE ACTION HANDLER
+========================================================= */
+
+document.addEventListener(
+  "click",
+  async function (event) {
+
+    const button =
+      event.target.closest(
+        "[data-action]"
+      );
+
+
+    if (!button) {
+      return;
+    }
+
+
+    const action =
+      button.dataset.action;
+
+
+    const id =
+      button.dataset.id;
+
+
+    if (!id) {
+      return;
+    }
+
+
+    try {
+
+      button.disabled = true;
+
+
+      /*
+       * DELIVERY
+       */
+
+      if (
+        action === "delivery"
+      ) {
+
+        await markDelivered(
+          id
+        );
+
+      }
+
+
+      /*
+       * UNDELIVER
+       */
+
+      else if (
+        action === "undeliver"
+      ) {
+
+        await markUndelivered(
+          id
+        );
+
+      }
+
+
+      /*
+       * ACCOUNTS
+       */
+
+      else if (
+        action === "accounts"
+      ) {
+
+        await markAccountsCompleted(
+          id
+        );
+
+      }
+
+
+      /*
+       * DELETE
+       */
+
+      else if (
+        action === "delete"
+      ) {
+
+        await deleteShipment(
+          id
+        );
+
+      }
+
+
+      /*
+       * EDIT
+       */
+
+      else if (
+        action === "edit"
+      ) {
+
+        await editShipment(
+          id
+        );
+
+      }
+
+
+    } catch (error) {
+
+      console.error(
+        "ACTION ERROR:",
+        error
+      );
+
+      alert(
+        error.message ||
+        "Action failed."
+      );
+
+
+    } finally {
+
+      button.disabled =
+        false;
+
+    }
+
+  }
+);
+
+
+/* =========================================================
+   MARK DELIVERED
+========================================================= */
+
+async function markDelivered(
+  id
+) {
+
+  const date =
+    prompt(
+      "Enter delivery date (YYYY-MM-DD):",
+      new Date()
+        .toISOString()
+        .split("T")[0]
+    );
+
+
+  if (!date) {
+    return;
+  }
+
+
+  const token =
+    sessionStorage.getItem(
+      "chennai_access_token"
+    );
+
+
+  const response =
+    await fetch(
+      SUPABASE_URL +
+      "/rest/v1/shipments?id=eq." +
+      encodeURIComponent(id),
+      {
+
+        method: "PATCH",
+
+        headers: {
+          "apikey":
+            SUPABASE_KEY,
+
+          "Authorization":
+            "Bearer " + token,
+
+          "Content-Type":
+            "application/json",
+
+          "Prefer":
+            "return=representation"
+        },
+
+        body: JSON.stringify({
+
+          delivery_date:
+            date
+
+        })
+
+      }
+    );
+
+
+  const data =
+    await response.json();
+
+
+  if (!response.ok) {
+
+    throw new Error(
+      data.message ||
+      data.details ||
+      "Could not mark shipment as delivered."
+    );
+
+  }
+
+
+  await loadDashboard();
+
+  await loadShipments();
+
+}
+
+
+/* =========================================================
+   MARK UNDELIVERED
+========================================================= */
+
+async function markUndelivered(
+  id
+) {
+
+  const confirmed =
+    confirm(
+      "Are you sure you want to mark this shipment as undelivered?"
+    );
+
+
+  if (!confirmed) {
+    return;
+  }
+
+
+  const token =
+    sessionStorage.getItem(
+      "chennai_access_token"
+    );
+
+
+  const response =
+    await fetch(
+      SUPABASE_URL +
+      "/rest/v1/shipments?id=eq." +
+      encodeURIComponent(id),
+      {
+
+        method: "PATCH",
+
+        headers: {
+          "apikey":
+            SUPABASE_KEY,
+
+          "Authorization":
+            "Bearer " + token,
+
+          "Content-Type":
+            "application/json",
+
+          "Prefer":
+            "return=representation"
+        },
+
+        body: JSON.stringify({
+
+          delivery_date:
+            null,
+
+          /*
+           * If delivery is cancelled,
+           * TOPAY must also leave Accounts.
+           */
+          accounts_date:
+            null
+
+        })
+
+      }
+    );
+
+
+  const data =
+    await response.json();
+
+
+  if (!response.ok) {
+
+    throw new Error(
+      data.message ||
+      data.details ||
+      "Could not undo delivery."
+    );
+
+  }
+
+
+  await loadDashboard();
+
+  await loadShipments();
+
+}
+
+
+/* =========================================================
+   MARK ACCOUNTS COMPLETED
+========================================================= */
+
+async function markAccountsCompleted(
+  id
+) {
+
+  const date =
+    prompt(
+      "Enter accounts completion date (YYYY-MM-DD):",
+      new Date()
+        .toISOString()
+        .split("T")[0]
+    );
+
+
+  if (!date) {
+    return;
+  }
+
+
+  const token =
+    sessionStorage.getItem(
+      "chennai_access_token"
+    );
+
+
+  const response =
+    await fetch(
+      SUPABASE_URL +
+      "/rest/v1/shipments?id=eq." +
+      encodeURIComponent(id),
+      {
+
+        method: "PATCH",
+
+        headers: {
+          "apikey":
+            SUPABASE_KEY,
+
+          "Authorization":
+            "Bearer " + token,
+
+          "Content-Type":
+            "application/json",
+
+          "Prefer":
+            "return=representation"
+        },
+
+        body: JSON.stringify({
+
+          accounts_date:
+            date
+
+        })
+
+      }
+    );
+
+
+  const data =
+    await response.json();
+
+
+  if (!response.ok) {
+
+    throw new Error(
+      data.message ||
+      data.details ||
+      "Could not complete accounts."
+    );
+
+  }
+
+
+  await loadDashboard();
+
+  await loadShipments();
 
 }
