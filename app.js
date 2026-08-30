@@ -2825,11 +2825,74 @@ document.addEventListener(
 
     if (action === "delivery") {
 
-      await markDelivered(
-        id
-      );
+  await markDelivered(
+    id
+  );
 
-    }
+}
+
+
+if (action === "edit") {
+
+  const shipment =
+    shipments.find(
+      function (item) {
+        return item.id === id;
+      }
+    );
+
+  if (shipment) {
+
+    await editShipment(
+      shipment
+    );
+
+  }
+
+  return;
+}
+
+
+if (action === "delete") {
+
+  const shipment =
+    shipments.find(
+      function (item) {
+        return item.id === id;
+      }
+    );
+
+  if (shipment) {
+
+    await deleteShipment(
+      shipment
+    );
+
+  }
+
+  return;
+}
+
+
+if (action === "undeliver") {
+
+  const shipment =
+    shipments.find(
+      function (item) {
+        return item.id === id;
+      }
+    );
+
+  if (shipment) {
+
+    await undeliverShipment(
+      shipment
+    );
+
+  }
+
+  return;
+}
 
 
     if (action === "accounts") {
