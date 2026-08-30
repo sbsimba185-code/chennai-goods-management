@@ -942,3 +942,513 @@ if (accessToken) {
   showLogin();
 
 }
+
+/* =========================================================
+   SMART PARTY / BRANCH SEARCH
+   ========================================================= */
+
+function normalizeUppercase(value) {
+  return value
+    .trim()
+    .replace(/\s+/g, " ")
+    .toUpperCase();
+}
+
+
+/* ---------------------------------------------------------
+   Generic smart search
+   --------------------------------------------------------- */
+
+function setupSmartSearch({
+  inputId,
+  hiddenId,
+  suggestionsId,
+  table,
+  label
+}) {
+
+  const input = document.getElementById(inputId);
+  const hidden = document.getElementById(hiddenId);
+  const suggestions = document.getElementById(suggestionsId);
+
+  if (!input || !hidden || !suggestions) {
+    console.error("Smart search elements missing:", label);
+    return;
+  }
+
+  let searchTimer = null;
+
+
+  function hideSuggestions() {
+    suggestions.hidden = true;
+    suggestions.innerHTML = "";
+  }
+
+
+  function showMessage(message) {
+
+    suggestions.innerHTML = "";
+
+    const item = document.createElement("div");
+
+    item.className = "smart-suggestion";
+
+    item.textContent = message;
+
+    suggestions.appendChild(item);
+
+    suggestions.hidden = false;
+  }
+
+
+  function showResults(rows, searchText) {
+
+    suggestions.innerHTML = "";
+
+    rows.forEach(function (row) {
+
+      const item = document.createElement("div");
+
+      item.className = "smart-suggestion";
+
+      const name = document.createElement("div");
+
+      name.className = "smart-suggestion-name";
+
+      name.textContent = row.name;
+
+      item.appendChild(name);
+
+
+      if (row.phone) {
+
+        const meta = document.createElement("div");
+
+        meta.className = "smart-suggestion-meta";
+
+        meta.textContent = row.phone;
+
+        item.appendChild(meta);
+
+      }
+
+
+      item.addEventListener("mousedown", function (event) {
+
+        event.preventDefault();
+
+        input.value = row.name;
+
+        hidden.value = row.id;
+
+        hideSuggestions();
+
+      });
+
+
+      suggestions.appendChild(item);
+
+    });
+
+
+    const createItem = document.createElement("div");
+
+    createItem.className = "smart-create";
+
+    createItem.textContent =
+      '+ ADD "' +
+      searchText +
+      '" AS NEW ' +
+      label.toUpperCase();
+
+
+    createItem.addEventListener("mousedown", function (event) {
+
+      event.preventDefault();
+
+      createNewRecord(
+        table,
+        label,
+        input,
+        hidden,
+        suggestions
+      );
+
+    });
+
+
+    suggestions.appendChild(createItem);
+
+    suggestions.hidden = false;
+  }
+
+
+  async function search() {
+
+    const searchText =
+      normalizeUppercase(input.value);
+
+    hidden.value = "";
+
+    if (!searchText) {
+
+      hideSuggestions();
+
+      return;
+    }
+
+
+    clearTimeout(searchTimer);
+
+
+    searchTimer = setTimeout(async function () {
+
+      try {
+
+        const token =
+          sessionStorage.getItem(
+            "chennai_access_token"
+          );
+
+
+        if (!token) {
+
+          showMessage("PLEASE SIGN IN AGAIN.");
+
+          return;
+        }
+
+
+        const response = await fetch(
+          SUPABASE_URL +
+          "/rest/v1/" +
+          table +
+          "?select=id,name,phone" +
+          "&name=ilike.*" +
+          encodeURIComponent(searchText) +
+          "*" +
+          "&is_active=eq.true" +
+          "&order=name.asc" +
+          "&limit=10",
+          {
+
+            method: "GET",
+
+            headers: {
+
+              "apikey": SUPABASE_KEY,
+
+              "Authorization":
+                "Bearer " + token
+
+            }
+
+          }
+        );
+
+
+        const data =
+          await response.json();
+
+
+        if (!response.ok) {
+
+          console.error(
+            "Search error:",
+            data
+          );
+
+          showMessage(
+            "UNABLE TO SEARCH " +
+            label.toUpperCase() +
+            "."
+          );
+
+          return;
+        }
+
+
+        showResults(
+          data || [],
+          searchText
+        );
+
+
+      } catch (error) {
+
+        console.error(
+          "Smart search error:",
+          error
+        );
+
+        showMessage(
+          "SEARCH ERROR."
+        );
+
+      }
+
+    }, 250);
+
+  }
+
+
+  input.addEventListener(
+    "input",
+    search
+  );
+
+
+  input.addEventListener(
+    "focus",
+    function () {
+
+      if (input.value.trim()) {
+        search();
+      }
+
+    }
+  );
+
+
+  input.addEventListener(
+    "blur",
+    function () {
+
+      setTimeout(
+        hideSuggestions,
+        200
+      );
+
+    }
+  );
+
+
+  input.addEventListener(
+    "change",
+    function () {
+
+      input.value =
+        normalizeUppercase(
+          input.value
+        );
+
+    }
+  );
+
+}
+
+
+/* ---------------------------------------------------------
+   CREATE NEW PARTY / BRANCH
+   --------------------------------------------------------- */
+
+async function createNewRecord(
+  table,
+  label,
+  input,
+  hidden,
+  suggestions
+) {
+
+  const name =
+    normalizeUppercase(
+      input.value
+    );
+
+
+  if (!name) {
+
+    alert(
+      "PLEASE ENTER A " +
+      label.toUpperCase() +
+      " NAME."
+    );
+
+    return;
+  }
+
+
+  const token =
+    sessionStorage.getItem(
+      "chennai_access_token"
+    );
+
+
+  if (!token) {
+
+    alert(
+      "YOUR LOGIN SESSION HAS EXPIRED. PLEASE SIGN IN AGAIN."
+    );
+
+    return;
+  }
+
+
+  try {
+
+    suggestions.hidden = true;
+
+
+    const response = await fetch(
+      SUPABASE_URL +
+      "/rest/v1/" +
+      table,
+      {
+
+        method: "POST",
+
+        headers: {
+
+          "apikey": SUPABASE_KEY,
+
+          "Authorization":
+            "Bearer " + token,
+
+          "Content-Type":
+            "application/json",
+
+          "Prefer":
+            "return=representation"
+
+        },
+
+        body: JSON.stringify({
+
+          name: name,
+
+          is_active: true
+
+        })
+
+      }
+    );
+
+
+    const data =
+      await response.json();
+
+
+    if (!response.ok) {
+
+      console.error(
+        "Create error:",
+        data
+      );
+
+
+      if (
+        response.status === 409 ||
+        (
+          data &&
+          data.code === "23505"
+        )
+      ) {
+
+        alert(
+          "THIS " +
+          label.toUpperCase() +
+          " ALREADY EXISTS. SEARCH AND SELECT IT."
+        );
+
+      } else {
+
+        alert(
+          data.message ||
+          data.error_description ||
+          "UNABLE TO CREATE " +
+          label.toUpperCase() +
+          "."
+        );
+
+      }
+
+      return;
+    }
+
+
+    if (!data || !data.length) {
+
+      alert(
+        label.toUpperCase() +
+        " WAS NOT CREATED."
+      );
+
+      return;
+    }
+
+
+    const created =
+      data[0];
+
+
+    input.value =
+      created.name;
+
+    hidden.value =
+      created.id;
+
+
+    suggestions.hidden =
+      true;
+
+
+    console.log(
+      "NEW " +
+      label.toUpperCase() +
+      " CREATED:",
+      created
+    );
+
+
+  } catch (error) {
+
+    console.error(
+      "Create record error:",
+      error
+    );
+
+    alert(
+      "ERROR CREATING " +
+      label.toUpperCase() +
+      "."
+    );
+
+  }
+
+}
+
+
+/* ---------------------------------------------------------
+   START SMART SEARCH
+   --------------------------------------------------------- */
+
+setupSmartSearch({
+
+  inputId: "party-name",
+
+  hiddenId: "party-id",
+
+  suggestionsId:
+    "party-suggestions",
+
+  table: "parties",
+
+  label: "party"
+
+});
+
+
+setupSmartSearch({
+
+  inputId: "branch-name",
+
+  hiddenId: "branch-id",
+
+  suggestionsId:
+    "branch-suggestions",
+
+  table: "branches",
+
+  label: "branch"
+
+});
