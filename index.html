@@ -188,18 +188,7 @@
         </button>
 
       </nav>
-      <button
-  class="nav-link"
-  data-page="stock"
-  type="button"
->
-  <span>Stock Checking</span>
 
-  <span
-    id="stock-count"
-    class="nav-count"
-  ></span>
-</button>
 
       <div class="sidebar-footer">
 
@@ -348,7 +337,10 @@
           </div>
 
 
-          <div id="recent-table" class="table-container"></div>
+          <div
+            id="recent-table"
+            class="table-container"
+          ></div>
 
         </div>
 
@@ -424,64 +416,70 @@
               </div>
 
 
-              <div class="field smart-field">
+              <div class="field">
 
-  <label for="party-name">
-    Party name
-  </label>
+                <label for="party-name">
+                  Party name
+                </label>
 
-  <input
-    id="party-name"
-    name="party_name"
-    type="text"
-    placeholder="TYPE PARTY NAME..."
-    autocomplete="off"
-    required
-  >
+                <input
+                  id="party-name"
+                  name="party_name"
+                  type="text"
+                  list="party-list"
+                  placeholder="Enter party name"
+                  required
+                  autocomplete="off"
+                >
 
-  <input
-    id="party-id"
-    type="hidden"
-    name="party_id"
-  >
+                <input
+                  id="party-id"
+                  type="hidden"
+                  name="party_id"
+                >
 
-  <div
-    id="party-suggestions"
-    class="smart-suggestions"
-    hidden
-  ></div>
+                <div
+                  id="party-suggestions"
+                  class="smart-suggestions"
+                  hidden
+                ></div>
 
-</div>
+                <datalist id="party-list"></datalist>
+
+              </div>
 
 
-              <div class="field smart-field">
+              <div class="field">
 
-  <label for="branch-name">
-    From branch
-  </label>
+                <label for="branch-name">
+                  From branch
+                </label>
 
-  <input
-    id="branch-name"
-    name="branch_name"
-    type="text"
-    placeholder="TYPE BRANCH NAME..."
-    autocomplete="off"
-    required
-  >
+                <input
+                  id="branch-name"
+                  name="branch_name"
+                  type="text"
+                  list="branch-list"
+                  placeholder="Enter branch"
+                  required
+                  autocomplete="off"
+                >
 
-  <input
-    id="branch-id"
-    type="hidden"
-    name="branch_id"
-  >
+                <input
+                  id="branch-id"
+                  type="hidden"
+                  name="branch_id"
+                >
 
-  <div
-    id="branch-suggestions"
-    class="smart-suggestions"
-    hidden
-  ></div>
+                <div
+                  id="branch-suggestions"
+                  class="smart-suggestions"
+                  hidden
+                ></div>
 
-</div>
+                <datalist id="branch-list"></datalist>
+
+              </div>
 
 
               <div class="field">
@@ -526,18 +524,26 @@
 
                 <label for="payment-type">
                   Payment type
-                  <select
-  id="payment-type"
-  name="payment_type"
->
-  <option value="TOPAY">TO PAY</option>
-  <option value="TBB">TBB</option>
-  <option value="PAID">PAID</option>
-</select>
-
                 </label>
 
-                
+                <select
+                  id="payment-type"
+                  name="payment_type"
+                >
+
+                  <option value="TOPAY">
+                    To Pay
+                  </option>
+
+                  <option value="TBB">
+                    TBB
+                  </option>
+
+                  <option value="PAID">
+                    Paid
+                  </option>
+
+                </select>
 
               </div>
 
@@ -554,6 +560,7 @@
                   rows="3"
                   placeholder="Optional remarks"
                 ></textarea>
+
               </div>
 
             </div>
@@ -622,7 +629,10 @@
           </div>
 
 
-          <div id="recent-table" class="table-container"></div>
+          <div
+            id="delivery-table"
+            class="table-container"
+          ></div>
 
         </div>
 
@@ -653,7 +663,7 @@
               </h2>
 
               <p>
-                Delivered goods waiting to be entered in accounts.
+                Delivered To Pay goods waiting to be entered in accounts.
               </p>
 
             </div>
@@ -668,7 +678,10 @@
           </div>
 
 
-          <div id="accounts-table" class="table-container"></div>
+          <div
+            id="accounts-table"
+            class="table-container"
+          ></div>
 
         </div>
 
@@ -714,7 +727,10 @@
           </div>
 
 
-          <div id="all-table" class="table-container"></div>
+          <div
+            id="all-table"
+            class="table-container"
+          ></div>
 
         </div>
 
@@ -722,102 +738,52 @@
 
 
       <!-- =================================================
-     STOCK CHECKING
-     ================================================= -->
+           STOCK
+           ================================================= -->
 
-<section
-  id="stock"
-  class="page"
->
-
-  <div class="section-card">
-
-    <div class="section-heading">
-
-      <div>
-
-        <p class="eyebrow">
-          GODOWN STOCK VERIFICATION
-        </p>
-
-        <h2>
-          Stock Checking
-        </h2>
-
-        <p>
-          Check whether received goods are currently available in the godown.
-        </p>
-
-      </div>
-
-      <input
-        id="stock-search"
-        class="search-input"
-        type="search"
-        placeholder="SEARCH LR, PARTY, SERIAL..."
+      <section
+        id="stock"
+        class="page"
       >
 
-    </div>
+        <div class="section-card">
+
+          <div class="section-heading">
+
+            <div>
+
+              <p class="eyebrow">
+                GODOWN
+              </p>
+
+              <h2>
+                Godown stock
+              </h2>
+
+            </div>
+
+          </div>
 
 
-    <!-- STOCK SUMMARY -->
+          <div
+            id="stock-table"
+            class="table-container"
+          >
 
-    <div class="stock-summary">
+            <p class="empty">
+              Stock verification will be added later.
+            </p>
 
-      <div class="stock-summary-item">
+          </div>
 
-        <span>
-          PENDING CHECK
-        </span>
+        </div>
 
-        <strong id="stock-pending-count">
-          0
-        </strong>
+      </section>
 
-      </div>
-
-
-      <div class="stock-summary-item">
-
-        <span>
-          IN GODOWN
-        </span>
-
-        <strong id="stock-found-count">
-          0
-        </strong>
-
-      </div>
-
-
-      <div class="stock-summary-item">
-
-        <span>
-          NOT FOUND
-        </span>
-
-        <strong id="stock-not-found-count">
-          0
-        </strong>
-
-      </div>
-
-    </div>
-
-
-    <!-- STOCK TABLE -->
-
-    <div id="stock-table" class="table-container">
-
-      <p class="empty">
-        Loading stock...
-      </p>
-
-    </div>
+    </main>
 
   </div>
 
-</section>
 
   <!-- =====================================================
        DATE DIALOG
