@@ -1437,3 +1437,184 @@ textarea:focus-visible {
   }
 
 }
+/* =========================================================
+   RESPONSIVE TABLE FIX
+   ========================================================= */
+
+/* All shipment table containers */
+#recent-table,
+#delivery-table,
+#accounts-table,
+#all-table,
+#stock-table {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+/* Tables themselves */
+#recent-table table,
+#delivery-table table,
+#accounts-table table,
+#all-table table,
+#stock-table table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+}
+
+/* Prevent columns from becoming ridiculously narrow */
+#recent-table th,
+#recent-table td,
+#delivery-table th,
+#delivery-table td,
+#accounts-table th,
+#accounts-table td,
+#all-table th,
+#all-table td,
+#stock-table th,
+#stock-table td {
+  white-space: nowrap;
+}
+
+/* Give table cells comfortable spacing */
+#recent-table th,
+#recent-table td,
+#delivery-table th,
+#delivery-table td,
+#accounts-table th,
+#accounts-table td,
+#all-table th,
+#all-table td,
+#stock-table th,
+#stock-table td {
+  padding: 12px 14px;
+}
+
+/* =========================================================
+   DESKTOP
+   ========================================================= */
+
+@media (min-width: 1025px) {
+
+  #recent-table,
+  #delivery-table,
+  #accounts-table,
+  #all-table,
+  #stock-table {
+    overflow-x: auto;
+  }
+
+}
+
+
+/* =========================================================
+   TABLET
+   ========================================================= */
+
+@media (max-width: 1024px) {
+
+  #recent-table,
+  #delivery-table,
+  #accounts-table,
+  #all-table,
+  #stock-table {
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  #recent-table table,
+  #delivery-table table,
+  #accounts-table table,
+  #all-table table,
+  #stock-table table {
+    min-width: 900px;
+  }
+
+}
+
+
+/* =========================================================
+   MOBILE
+   ========================================================= */
+
+@media (max-width: 700px) {
+
+  #recent-table,
+  #delivery-table,
+  #accounts-table,
+  #all-table,
+  #stock-table {
+    width: 100%;
+    overflow-x: auto;
+    border-radius: 10px;
+  }
+
+  #recent-table table,
+  #delivery-table table,
+  #accounts-table table,
+  #all-table table,
+  #stock-table table {
+    min-width: 900px;
+  }
+
+  #recent-table th,
+  #recent-table td,
+  #delivery-table th,
+  #delivery-table td,
+  #accounts-table th,
+  #accounts-table td,
+  #all-table th,
+  #all-table td,
+  #stock-table th,
+  #stock-table td {
+    padding: 10px 12px;
+    font-size: 13px;
+  }
+
+}
+
+
+/* =========================================================
+   MAKE SEARCH / HEADER RESPONSIVE
+   ========================================================= */
+
+@media (max-width: 700px) {
+
+  .section-heading {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
+  }
+
+  .search-input {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+}
+
+
+/* =========================================================
+   MOBILE TABLE SCROLLBAR
+   ========================================================= */
+
+#recent-table::-webkit-scrollbar,
+#delivery-table::-webkit-scrollbar,
+#accounts-table::-webkit-scrollbar,
+#all-table::-webkit-scrollbar,
+#stock-table::-webkit-scrollbar {
+  height: 8px;
+}
+
+#recent-table::-webkit-scrollbar-thumb,
+#delivery-table::-webkit-scrollbar-thumb,
+#accounts-table::-webkit-scrollbar-thumb,
+#all-table::-webkit-scrollbar-thumb,
+#stock-table::-webkit-scrollbar-thumb {
+  border-radius: 10px;
+}
