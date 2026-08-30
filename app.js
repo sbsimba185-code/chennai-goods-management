@@ -994,6 +994,185 @@ function renderTable(
 /* =========================================================
    STOCK TABLE
    ========================================================= */
+   function renderStockTable(
+  data
+) {
+
+  const element =
+    $("#stock-table");
+
+
+  if (!element) {
+    return;
+  }
+
+
+  if (
+    !data ||
+    !data.length
+  ) {
+
+    element.innerHTML =
+      `<p class="empty">
+        THERE ARE NO UNDELIVERED GOODS TO CHECK.
+      </p>`;
+
+    return;
+  }
+
+
+  element.innerHTML = `
+
+    <div class="table-wrap">
+
+      <table>
+
+        <thead>
+
+          <tr>
+
+            <th>LR NO.</th>
+
+            <th>PARTY</th>
+
+            <th>FROM</th>
+
+            <th>QTY</th>
+
+            <th>REMARKS</th>
+
+            <th>LAST CHECK</th>
+
+            <th>GODOWN STATUS</th>
+
+            <th>ACTIONS</th>
+
+          </tr>
+
+        </thead>
+
+        <tbody>
+
+          ${data
+            .map(
+              function (shipment) {
+
+                const status =
+                  shipment.stock_status;
+
+
+                const statusHtml =
+                  status
+                    ? `
+                      <span
+                        class="badge ${
+                          status ===
+                          "IN GODOWN"
+                            ? "completed"
+                            : "pending"
+                        }"
+                      >
+                        ${
+                          status ===
+                          "IN GODOWN"
+                            ? "IN GODOWN"
+                            : "NOT FOUND"
+                        }
+                      </span>
+                    `
+                    : `
+                      <span class="muted">
+                        NOT CHECKED
+                      </span>
+                    `;
+
+
+                return `
+
+                  <tr>
+
+                    <td>
+                      <b>
+                        ${safe(
+                          shipment.lr_number
+                        )}
+                      </b>
+                    </td>
+
+                    <td>
+                      ${safe(
+                        shipment.party_name
+                      )}
+                    </td>
+
+                    <td>
+                      ${safe(
+                        shipment.branch_name
+                      )}
+                    </td>
+
+                    <td>
+                      ${safe(
+                        shipment.quantity
+                      )}
+                    </td>
+
+                    <td>
+                      ${
+                        safe(
+                          shipment.remarks
+                        ) || "—"
+                      }
+                    </td>
+
+                    <td>
+                      ${formatDate(
+                        shipment.stock_checked_date
+                      )}
+                    </td>
+
+                    <td>
+                      ${statusHtml}
+                    </td>
+
+                    <td class="actions">
+
+                      ${
+                        actionButton(
+                          "in-godown",
+                          shipment,
+                          "IN GODOWN"
+                        )
+                      }
+
+                      ${
+                        actionButton(
+                          "not-found",
+                          shipment,
+                          "NOT FOUND",
+                          "danger"
+                        )
+                      }
+
+                    </td>
+
+                  </tr>
+
+                `;
+
+              }
+            )
+            .join("")}
+
+        </tbody>
+
+      </table>
+
+    </div>
+
+  `;
+}
+
 
 /* =========================================================
    RENDER EVERYTHING
@@ -3331,57 +3510,6 @@ async function loadStockPage() {
 /* =========================================================
    RENDER STOCK TABLE
    ========================================================= */
-
-function renderStockTable() {
-
-  if (!stockTableElement) {
-    return;
-  }
-
-
-  const searchText =
-    stockSearchElement
-      ? stockSearchElement.value
-          .trim()
-          .toUpperCase()
-      : "";
-
-
-  const filtered =
-    stockShipments.filter(
-      function (shipment) {
-
-        if (!searchText) {
-          return true;
-        }
-
-
-        const combined =
-          (
-            String(
-              shipment.serial_no || ""
-            ) +
-            " " +
-            String(
-              shipment.lr_number || ""
-            ) +
-            " " +
-            String(
-              shipment.party_name || ""
-            ) +
-            " " +
-            String(
-              shipment.branch_name || ""
-            )
-          ).toUpperCase();
-
-
-        return combined.includes(
-          searchText
-        );
-
-      }
-    );
 
 
   /*
