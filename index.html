@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chennai Goods Management</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="extras.css" />
+  <link rel="stylesheet" href="cloud.css" />
+</head>
+<body>
+  <section id="login-screen" class="login-screen">
+    <form id="login-form" class="login-card">
+      <span class="brand-mark">CG</span>
+      <p class="eyebrow">CHENNAI GOODS MANAGEMENT</p>
+      <h1>Welcome back</h1>
+      <p>Sign in to access the Chennai goods register.</p>
+      <label>Username<input value="nova" readonly aria-readonly="true" /></label>
+      <label>Password<input id="login-password" type="password" required autocomplete="current-password" /></label>
+      <button class="primary" type="submit">Sign in</button>
+      <p id="login-message" class="login-message"></p>
+    </form>
+  </section>
+  <div id="app-shell" hidden>
+  <aside class="sidebar">
+    <div class="brand"><span class="brand-mark">CG</span><span>Chennai Goods<small>Management</small></span></div>
+    <nav>
+      <button class="nav-link active" data-page="dashboard">Overview</button>
+      <button class="nav-link" data-page="receive">Receive goods</button>
+      <button class="nav-link" data-page="delivery">Pending delivery <span id="delivery-count" class="count"></span></button>
+      <button class="nav-link" data-page="accounts">Accounts pending <span id="accounts-count" class="count"></span></button>
+      <button class="nav-link" data-page="stock">Godown stock check</button>
+      <button class="nav-link" data-page="all">All shipments</button>
+    </nav>
+    <p class="side-note">Chennai branch<br><span>Internal goods register</span></p>
+  </aside>
+  <main>
+    <header><div><p class="eyebrow" id="page-kicker">CHENNAI BRANCH</p><h1 id="page-title">Good morning</h1></div><div class="header-actions"><button id="sign-out" class="secondary">Sign out</button><button id="receive-button" class="primary">+ Receive goods</button></div></header>
+
+    <section id="dashboard" class="page active">
+      <div class="stats">
+        <article><span class="icon blue">↓</span><p>Received today</p><strong id="stat-received">0</strong></article>
+        <article><span class="icon amber">!</span><p>Pending delivery</p><strong id="stat-delivery">0</strong></article>
+        <article><span class="icon violet">₹</span><p>Accounts pending</p><strong id="stat-accounts">0</strong></article>
+        <article><span class="icon green">✓</span><p>Completed today</p><strong id="stat-completed">0</strong></article>
+      </div>
+      <section class="panel recent"><div class="panel-head"><div><h2>Recent shipments</h2><p>Latest goods received at Chennai</p></div><button class="text-button" data-go="all">View all</button></div><div id="recent-table"></div></section>
+    </section>
+
+    <section id="receive" class="page">
+      <div class="section-heading"><h2>Receive goods</h2><p>Enter the actual business date. New party and branch names are saved automatically.</p></div>
+      <form id="shipment-form" class="form-card">
+        <label>Received date<input type="date" name="received_date" required /></label>
+        <label>LR number<input type="text" name="lr_number" placeholder="Example: TPTN/08/2250" required /></label>
+        <label>Party name<input type="text" name="party_name" list="party-list" placeholder="Search or enter a new party" required /><datalist id="party-list"></datalist></label>
+        <label>From branch<input type="text" name="branch_name" list="branch-list" placeholder="Search or enter a new branch" required /><datalist id="branch-list"></datalist></label>
+        <label>Quantity<input type="number" name="quantity" min="0.01" step="0.01" required /></label>
+        <label>Amount<input type="number" name="amount" min="0" step="0.01" required /></label>
+        <label>Payment type<select name="payment_type" required><option value="TOPAY">TOPAY</option><option value="TBB">TBB</option><option value="PAID">PAID</option></select></label>
+        <label class="wide">Remarks<textarea name="remarks" rows="3" placeholder="Optional notes"></textarea></label>
+        <div class="wide form-actions"><button class="primary" type="submit">Save goods receipt</button><span id="form-message"></span></div>
+      </form>
+    </section>
+
+    <section id="delivery" class="page"><div class="section-heading"><h2>Pending delivery</h2><p>Goods waiting for customer collection.</p></div><div class="panel"><div class="toolbar"><input class="search" data-search="delivery" placeholder="Search LR, party, or branch" /></div><div id="delivery-table"></div></div></section>
+    <section id="accounts" class="page"><div class="section-heading"><h2>Accounts pending</h2><p>Delivered goods waiting for an A/C date.</p></div><div class="panel"><div class="toolbar"><input class="search" data-search="accounts" placeholder="Search LR, party, or branch" /></div><div id="accounts-table"></div></div></section>
+    <section id="stock" class="page"><div class="section-heading"><h2>Godown stock check</h2><p>Check every undelivered item physically in the godown. Each check is saved with today’s date.</p></div><div class="panel"><div class="toolbar"><input class="search" data-search="stock" placeholder="Search LR, party, or branch" /></div><div id="stock-table"></div></div></section>
+    <section id="all" class="page"><div class="section-heading"><h2>All shipments</h2><p>Search the full Chennai goods register.</p></div><div class="panel"><div class="toolbar"><input class="search" data-search="all" placeholder="Search LR, party, or branch" /></div><div id="all-table"></div></div></section>
+  </main>
+  <dialog id="date-dialog"><form method="dialog" id="date-form"><button class="close" value="cancel" aria-label="Close">×</button><h2 id="dialog-title">Mark delivered</h2><p id="dialog-detail"></p><label id="date-label">Delivery date<input id="action-date" type="date" required /></label><div class="form-actions"><button value="cancel" class="secondary">Cancel</button><button id="confirm-action" class="primary" value="default">Save</button></div></form></dialog>
+  </div>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
