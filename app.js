@@ -1,15 +1,38 @@
+/* =========================================================
+   CHENNAI GOODS MANAGEMENT
+   APP.JS
+   ========================================================= */
+
+
+/* =========================================================
+   SUPABASE CONFIGURATION
+   ========================================================= */
+
 const SUPABASE_URL =
   "https://yonxttybnkvxwnbhzwyi.supabase.co";
 
 const SUPABASE_KEY =
   "sb_publishable_EC6Tm1kbWuPEPtfeeJED9Q_6dbqOZVh";
 
-const loginForm = document.getElementById("login-form");
-const loginButton = document.getElementById("login-button");
-const loginMessage = document.getElementById("login-message");
 
-const loginScreen = document.getElementById("login-screen");
-const appShell = document.getElementById("app-shell");
+/* =========================================================
+   ELEMENTS
+   ========================================================= */
+
+const loginForm =
+  document.getElementById("login-form");
+
+const loginButton =
+  document.getElementById("login-button");
+
+const loginMessage =
+  document.getElementById("login-message");
+
+const loginScreen =
+  document.getElementById("login-screen");
+
+const appShell =
+  document.getElementById("app-shell");
 
 const shipmentForm =
   document.getElementById("shipment-form");
@@ -17,32 +40,63 @@ const shipmentForm =
 const formMessage =
   document.getElementById("form-message");
 
+
+/* =========================================================
+   ACCESS TOKEN
+   ========================================================= */
+
 let accessToken =
-  sessionStorage.getItem("chennai_access_token");
+  sessionStorage.getItem(
+    "chennai_access_token"
+  );
 
 
 /* =========================================================
-   LOGIN SCREEN
+   SHOW LOGIN
    ========================================================= */
 
 function showLogin() {
-  loginScreen.hidden = false;
-  loginScreen.style.display = "grid";
 
-  appShell.hidden = true;
-  appShell.style.display = "none";
+  if (loginScreen) {
+
+    loginScreen.hidden = false;
+    loginScreen.style.display = "grid";
+
+  }
+
+  if (appShell) {
+
+    appShell.hidden = true;
+    appShell.style.display = "none";
+
+  }
+
 }
 
 
-function showApp() {
-  loginScreen.hidden = true;
-  loginScreen.style.display = "none";
+/* =========================================================
+   SHOW APP
+   ========================================================= */
 
-  appShell.hidden = false;
-  appShell.style.display = "block";
+function showApp() {
+
+  if (loginScreen) {
+
+    loginScreen.hidden = true;
+    loginScreen.style.display = "none";
+
+  }
+
+  if (appShell) {
+
+    appShell.hidden = false;
+    appShell.style.display = "block";
+
+  }
 
   loadParties();
   loadBranches();
+
 }
 
 
@@ -51,11 +105,34 @@ function showApp() {
    ========================================================= */
 
 function supabaseHeaders() {
+
   return {
-    "apikey": SUPABASE_KEY,
-    "Authorization": "Bearer " + accessToken,
-    "Content-Type": "application/json"
+
+    "apikey":
+      SUPABASE_KEY,
+
+    "Authorization":
+      "Bearer " + accessToken,
+
+    "Content-Type":
+      "application/json"
+
   };
+
+}
+
+
+/* =========================================================
+   UPPERCASE NORMALIZATION
+   ========================================================= */
+
+function normalizeUppercase(value) {
+
+  return String(value || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toUpperCase();
+
 }
 
 
@@ -63,110 +140,165 @@ function supabaseHeaders() {
    LOGIN
    ========================================================= */
 
-loginForm.addEventListener(
-  "submit",
-  async function (event) {
+if (loginForm) {
 
-    event.preventDefault();
+  loginForm.addEventListener(
+    "submit",
+    async function (event) {
 
-    const email =
-      document
-        .getElementById("login-email")
-        .value
-        .trim();
+      event.preventDefault();
 
-    const password =
-      document
-        .getElementById("login-password")
-        .value;
 
-    if (!password) {
+      const email =
+        document
+          .getElementById("login-email")
+          .value
+          .trim();
+
+
+      const password =
+        document
+          .getElementById("login-password")
+          .value;
+
+
+      if (!password) {
+
+        loginMessage.textContent =
+          "Please enter your password.";
+
+        return;
+
+      }
+
+
+      loginButton.disabled = true;
+
+      loginButton.textContent =
+        "Signing in...";
+
       loginMessage.textContent =
-        "Please enter your password.";
-      return;
-    }
+        "Please wait...";
 
-    loginButton.disabled = true;
-    loginButton.textContent = "Signing in...";
-    loginMessage.textContent = "Please wait...";
 
-    try {
+      try {
 
-      const response = await fetch(
-        SUPABASE_URL +
-        "/auth/v1/token?grant_type=password",
-        {
-          method: "POST",
+        const response =
+          await fetch(
 
-          headers: {
-            "apikey": SUPABASE_KEY,
-            "Content-Type": "application/json"
-          },
+            SUPABASE_URL +
+            "/auth/v1/token?grant_type=password",
 
-          body: JSON.stringify({
-            email: email,
-            password: password
-          })
+            {
+
+              method: "POST",
+
+              headers: {
+
+                "apikey":
+                  SUPABASE_KEY,
+
+                "Content-Type":
+                  "application/json"
+
+              },
+
+              body: JSON.stringify({
+
+                email:
+                  email,
+
+                password:
+                  password
+
+              })
+
+            }
+
+          );
+
+
+        const data =
+          await response.json();
+
+
+        console.log(
+          "SUPABASE LOGIN RESPONSE:",
+          data
+        );
+
+
+        if (!response.ok) {
+
+          throw new Error(
+
+            data.error_description ||
+            data.msg ||
+            data.message ||
+            "Login failed."
+
+          );
+
         }
-      );
 
-      const data =
-        await response.json();
 
-      console.log(
-        "Supabase login response:",
-        data
-      );
+        if (!data.access_token) {
 
-      if (!response.ok) {
-        throw new Error(
-          data.error_description ||
-          data.msg ||
-          "Login failed."
+          throw new Error(
+            "No login token was returned."
+          );
+
+        }
+
+
+        accessToken =
+          data.access_token;
+
+
+        sessionStorage.setItem(
+          "chennai_access_token",
+          accessToken
         );
-      }
 
-      if (!data.access_token) {
-        throw new Error(
-          "No login token was returned."
+
+        loginMessage.textContent =
+          "";
+
+
+        showApp();
+
+
+        console.log(
+          "LOGIN SUCCESSFUL"
         );
+
+
+      } catch (error) {
+
+        console.error(
+          "LOGIN ERROR:",
+          error
+        );
+
+
+        loginMessage.textContent =
+          error.message;
+
+
+      } finally {
+
+        loginButton.disabled =
+          false;
+
+        loginButton.textContent =
+          "Sign in";
+
       }
-
-      accessToken =
-        data.access_token;
-
-      sessionStorage.setItem(
-        "chennai_access_token",
-        accessToken
-      );
-
-      loginMessage.textContent = "";
-
-      showApp();
-
-      console.log(
-        "LOGIN SUCCESSFUL"
-      );
-
-    } catch (error) {
-
-      console.error(
-        "LOGIN ERROR:",
-        error
-      );
-
-      loginMessage.textContent =
-        error.message;
-
-    } finally {
-
-      loginButton.disabled = false;
-      loginButton.textContent = "Sign in";
 
     }
+  );
 
-  }
-);
+}
 
 
 /* =========================================================
@@ -174,7 +306,10 @@ loginForm.addEventListener(
    ========================================================= */
 
 const signOutButton =
-  document.getElementById("sign-out");
+  document.getElementById(
+    "sign-out"
+  );
+
 
 if (signOutButton) {
 
@@ -184,13 +319,24 @@ if (signOutButton) {
 
       accessToken = null;
 
+
       sessionStorage.removeItem(
         "chennai_access_token"
       );
 
-      document.getElementById(
-        "login-password"
-      ).value = "";
+
+      const passwordInput =
+        document.getElementById(
+          "login-password"
+        );
+
+
+      if (passwordInput) {
+
+        passwordInput.value = "";
+
+      }
+
 
       showLogin();
 
@@ -207,47 +353,80 @@ if (signOutButton) {
 async function loadParties() {
 
   const partyList =
-    document.getElementById("party-list");
+    document.getElementById(
+      "party-list"
+    );
+
 
   if (!partyList) {
+
     return;
+
   }
+
+
+  if (!accessToken) {
+
+    return;
+
+  }
+
 
   try {
 
-    const response = await fetch(
-      SUPABASE_URL +
-      "/rest/v1/parties?select=id,name&is_active=eq.true&order=name.asc",
-      {
-        method: "GET",
-        headers: supabaseHeaders()
-      }
-    );
+    const response =
+      await fetch(
+
+        SUPABASE_URL +
+        "/rest/v1/parties" +
+        "?select=id,name,phone" +
+        "&is_active=eq.true" +
+        "&order=name.asc",
+
+        {
+
+          method: "GET",
+
+          headers:
+            supabaseHeaders()
+
+        }
+
+      );
+
+
+    const data =
+      await response.json();
+
 
     if (!response.ok) {
 
-      const errorText =
-        await response.text();
-
-      throw new Error(
-        "Could not load parties: " +
-        errorText
+      console.error(
+        "PARTY LOAD ERROR:",
+        data
       );
+
+      return;
+
     }
 
-    const parties =
-      await response.json();
 
-    partyList.innerHTML = "";
+    partyList.innerHTML =
+      "";
 
-    parties.forEach(
+
+    data.forEach(
       function (party) {
 
         const option =
-          document.createElement("option");
+          document.createElement(
+            "option"
+          );
+
 
         option.value =
           party.name;
+
 
         partyList.appendChild(
           option
@@ -256,10 +435,12 @@ async function loadParties() {
       }
     );
 
+
     console.log(
-      "Parties loaded:",
-      parties.length
+      "PARTIES LOADED:",
+      data.length
     );
+
 
   } catch (error) {
 
@@ -280,47 +461,80 @@ async function loadParties() {
 async function loadBranches() {
 
   const branchList =
-    document.getElementById("branch-list");
+    document.getElementById(
+      "branch-list"
+    );
+
 
   if (!branchList) {
+
     return;
+
   }
+
+
+  if (!accessToken) {
+
+    return;
+
+  }
+
 
   try {
 
-    const response = await fetch(
-      SUPABASE_URL +
-      "/rest/v1/branches?select=id,name&is_active=eq.true&order=name.asc",
-      {
-        method: "GET",
-        headers: supabaseHeaders()
-      }
-    );
+    const response =
+      await fetch(
+
+        SUPABASE_URL +
+        "/rest/v1/branches" +
+        "?select=id,name,phone" +
+        "&is_active=eq.true" +
+        "&order=name.asc",
+
+        {
+
+          method: "GET",
+
+          headers:
+            supabaseHeaders()
+
+        }
+
+      );
+
+
+    const data =
+      await response.json();
+
 
     if (!response.ok) {
 
-      const errorText =
-        await response.text();
-
-      throw new Error(
-        "Could not load branches: " +
-        errorText
+      console.error(
+        "BRANCH LOAD ERROR:",
+        data
       );
+
+      return;
+
     }
 
-    const branches =
-      await response.json();
 
-    branchList.innerHTML = "";
+    branchList.innerHTML =
+      "";
 
-    branches.forEach(
+
+    data.forEach(
       function (branch) {
 
         const option =
-          document.createElement("option");
+          document.createElement(
+            "option"
+          );
+
 
         option.value =
           branch.name;
+
 
         branchList.appendChild(
           option
@@ -329,10 +543,12 @@ async function loadBranches() {
       }
     );
 
+
     console.log(
-      "Branches loaded:",
-      branches.length
+      "BRANCHES LOADED:",
+      data.length
     );
+
 
   } catch (error) {
 
@@ -347,106 +563,150 @@ async function loadBranches() {
 
 
 /* =========================================================
-   FIND PARTY
+   FIND PARTY ID
    ========================================================= */
 
 async function findPartyId(
   partyName
 ) {
 
+  const name =
+    normalizeUppercase(
+      partyName
+    );
+
+
   const url =
     SUPABASE_URL +
     "/rest/v1/parties" +
     "?select=id,name" +
     "&name=eq." +
-    encodeURIComponent(partyName) +
+    encodeURIComponent(name) +
     "&is_active=eq.true" +
     "&limit=1";
 
+
   const response =
     await fetch(
+
       url,
+
       {
+
         method: "GET",
-        headers: supabaseHeaders()
+
+        headers:
+          supabaseHeaders()
+
       }
+
     );
+
 
   const data =
     await response.json();
 
+
   if (!response.ok) {
 
     console.error(
-      "Party lookup error:",
+      "PARTY LOOKUP ERROR:",
       data
     );
+
 
     throw new Error(
       "Could not find party."
     );
+
   }
+
 
   if (!data.length) {
 
     throw new Error(
-      "Party not found. Please select an existing party."
+      "PARTY NOT FOUND. PLEASE SELECT OR CREATE THE PARTY."
     );
+
   }
 
+
   return data[0].id;
+
 }
 
 
 /* =========================================================
-   FIND BRANCH
+   FIND BRANCH ID
    ========================================================= */
 
 async function findBranchId(
   branchName
 ) {
 
+  const name =
+    normalizeUppercase(
+      branchName
+    );
+
+
   const url =
     SUPABASE_URL +
     "/rest/v1/branches" +
     "?select=id,name" +
     "&name=eq." +
-    encodeURIComponent(branchName) +
+    encodeURIComponent(name) +
     "&is_active=eq.true" +
     "&limit=1";
 
+
   const response =
     await fetch(
+
       url,
+
       {
+
         method: "GET",
-        headers: supabaseHeaders()
+
+        headers:
+          supabaseHeaders()
+
       }
+
     );
+
 
   const data =
     await response.json();
 
+
   if (!response.ok) {
 
     console.error(
-      "Branch lookup error:",
+      "BRANCH LOOKUP ERROR:",
       data
     );
+
 
     throw new Error(
       "Could not find branch."
     );
+
   }
+
 
   if (!data.length) {
 
     throw new Error(
-      "Branch not found. Please select an existing branch."
+      "BRANCH NOT FOUND. PLEASE SELECT OR CREATE THE BRANCH."
     );
+
   }
 
+
   return data[0].id;
+
 }
 
 
@@ -461,89 +721,120 @@ async function saveShipment() {
       "received-date"
     ).value;
 
+
   const lrNumber =
-    document.getElementById(
-      "lr-number"
-    ).value
-    .trim();
+    normalizeUppercase(
+      document.getElementById(
+        "lr-number"
+      ).value
+    );
+
 
   const partyName =
-    document.getElementById(
-      "party-name"
-    ).value
-    .trim();
+    normalizeUppercase(
+      document.getElementById(
+        "party-name"
+      ).value
+    );
+
 
   const branchName =
-    document.getElementById(
-      "branch-name"
-    ).value
-    .trim();
+    normalizeUppercase(
+      document.getElementById(
+        "branch-name"
+      ).value
+    );
+
 
   const quantity =
     document.getElementById(
       "quantity"
     ).value;
 
+
   const amount =
     document.getElementById(
       "amount"
     ).value;
+
 
   const paymentType =
     document.getElementById(
       "payment-type"
     ).value;
 
+
   const remarks =
-    document.getElementById(
-      "remarks"
-    ).value
-    .trim();
+    normalizeUppercase(
+      document.getElementById(
+        "remarks"
+      ).value
+    );
 
 
-  /* VALIDATION */
+  /* -------------------------------------------------------
+     VALIDATION
+     ------------------------------------------------------- */
 
   if (!receivedDate) {
+
     throw new Error(
-      "Please select the received date."
+      "PLEASE SELECT THE RECEIVED DATE."
     );
+
   }
+
 
   if (!lrNumber) {
+
     throw new Error(
-      "Please enter the LR number."
+      "PLEASE ENTER THE LR NUMBER."
     );
+
   }
+
 
   if (!partyName) {
+
     throw new Error(
-      "Please select a party."
+      "PLEASE SELECT OR CREATE A PARTY."
     );
+
   }
 
+
   if (!branchName) {
+
     throw new Error(
-      "Please select the from branch."
+      "PLEASE SELECT OR CREATE THE FROM BRANCH."
     );
+
   }
+
 
   if (
     !quantity ||
     Number(quantity) <= 0
   ) {
+
     throw new Error(
-      "Quantity must be greater than zero."
+      "QUANTITY MUST BE GREATER THAN ZERO."
     );
+
   }
+
 
   if (
     amount === "" ||
     Number(amount) < 0
   ) {
+
     throw new Error(
-      "Amount cannot be negative."
+      "AMOUNT CANNOT BE NEGATIVE."
     );
+
   }
+
 
   if (
     ![
@@ -552,18 +843,23 @@ async function saveShipment() {
       "PAID"
     ].includes(paymentType)
   ) {
+
     throw new Error(
-      "Invalid payment type."
+      "INVALID PAYMENT TYPE."
     );
+
   }
 
 
-  /* FIND FOREIGN KEYS */
+  /* -------------------------------------------------------
+     FOREIGN KEYS
+     ------------------------------------------------------- */
 
   const partyId =
     await findPartyId(
       partyName
     );
+
 
   const branchId =
     await findBranchId(
@@ -571,59 +867,71 @@ async function saveShipment() {
     );
 
 
-  /* SAVE SHIPMENT */
+  /* -------------------------------------------------------
+     INSERT SHIPMENT
+     ------------------------------------------------------- */
 
   const shipmentResponse =
     await fetch(
+
       SUPABASE_URL +
       "/rest/v1/shipments",
+
       {
+
         method: "POST",
 
         headers: {
+
           ...supabaseHeaders(),
+
           "Prefer":
             "return=representation"
+
         },
 
-        body: JSON.stringify({
-          received_date:
-            receivedDate,
+        body:
+          JSON.stringify({
 
-          lr_number:
-            lrNumber,
+            received_date:
+              receivedDate,
 
-          party_id:
-            partyId,
+            lr_number:
+              lrNumber,
 
-          quantity:
-            Number(quantity),
+            party_id:
+              partyId,
 
-          amount:
-            Number(amount),
+            quantity:
+              Number(quantity),
 
-          payment_type:
-            paymentType,
+            amount:
+              Number(amount),
 
-          from_branch_id:
-            branchId,
+            payment_type:
+              paymentType,
 
-          delivery_date:
-            null,
+            from_branch_id:
+              branchId,
 
-          accounts_date:
-            null,
+            delivery_date:
+              null,
 
-          remarks:
-            remarks || null
-        })
+            accounts_date:
+              null,
+
+            remarks:
+              remarks || null
+
+          })
+
       }
+
     );
 
 
   const shipmentData =
-    await shipmentResponse
-      .json();
+    await shipmentResponse.json();
 
 
   if (!shipmentResponse.ok) {
@@ -633,13 +941,17 @@ async function saveShipment() {
       shipmentData
     );
 
+
     throw new Error(
+
       shipmentData.message ||
       shipmentData.details ||
       shipmentData.hint ||
       shipmentData.error ||
-      "Supabase could not save the shipment."
+      "SUPABASE COULD NOT SAVE THE SHIPMENT."
+
     );
+
   }
 
 
@@ -649,8 +961,9 @@ async function saveShipment() {
   ) {
 
     throw new Error(
-      "Shipment save response was empty."
+      "SHIPMENT SAVE RESPONSE WAS EMPTY."
     );
+
   }
 
 
@@ -658,31 +971,48 @@ async function saveShipment() {
     shipmentData[0];
 
 
-  /* CREATE RECEIVED EVENT */
+  /* -------------------------------------------------------
+     CREATE RECEIVED EVENT
+     ------------------------------------------------------- */
 
   const eventResponse =
     await fetch(
+
       SUPABASE_URL +
       "/rest/v1/shipment_events",
+
       {
+
         method: "POST",
 
-        headers: supabaseHeaders(),
+        headers: {
 
-        body: JSON.stringify({
-          shipment_id:
-            shipment.id,
+          ...supabaseHeaders(),
 
-          event_type:
-            "RECEIVED",
+          "Prefer":
+            "return=minimal"
 
-          event_date:
-            receivedDate,
+        },
 
-          notes:
-            remarks || null
-        })
+        body:
+          JSON.stringify({
+
+            shipment_id:
+              shipment.id,
+
+            event_type:
+              "RECEIVED",
+
+            event_date:
+              receivedDate,
+
+            notes:
+              remarks || null
+
+          })
+
       }
+
     );
 
 
@@ -691,18 +1021,27 @@ async function saveShipment() {
     const eventError =
       await eventResponse.text();
 
+
     console.error(
-      "EVENT SAVE ERROR:",
+      "RECEIVED EVENT ERROR:",
       eventError
     );
 
-    throw new Error(
-      "Shipment was saved, but the RECEIVED event could not be recorded."
+
+    /*
+       Shipment itself has already been saved.
+       We report the event problem separately.
+    */
+
+    console.warn(
+      "SHIPMENT SAVED BUT RECEIVED EVENT FAILED."
     );
+
   }
 
 
   return shipment;
+
 }
 
 
@@ -718,10 +1057,28 @@ if (shipmentForm) {
 
       event.preventDefault();
 
+
       const submitButton =
         shipmentForm.querySelector(
           'button[type="submit"]'
         );
+
+
+      if (!accessToken) {
+
+        if (formMessage) {
+
+          formMessage.textContent =
+            "YOUR LOGIN SESSION HAS EXPIRED. PLEASE SIGN IN AGAIN.";
+
+        }
+
+        showLogin();
+
+        return;
+
+      }
+
 
       if (submitButton) {
 
@@ -729,36 +1086,75 @@ if (shipmentForm) {
           true;
 
         submitButton.textContent =
-          "Saving...";
+          "SAVING...";
+
       }
+
 
       if (formMessage) {
 
         formMessage.textContent =
-          "Saving to cloud...";
+          "SAVING TO CLOUD...";
 
       }
+
 
       try {
 
         const shipment =
           await saveShipment();
 
+
         if (formMessage) {
 
           formMessage.textContent =
-            "Saved successfully. LR " +
-            shipment.lr_number +
-            " has been recorded.";
+            "RECEIVE GOODS SAVED SUCCESSFULLY — SERIAL NO. " +
+            shipment.serial_no;
 
         }
 
+
         shipmentForm.reset();
+
+
+        /*
+           Clear hidden Party / Branch IDs
+           if they exist.
+        */
+
+        const partyIdInput =
+          document.getElementById(
+            "party-id"
+          );
+
+
+        if (partyIdInput) {
+
+          partyIdInput.value =
+            "";
+
+        }
+
+
+        const branchIdInput =
+          document.getElementById(
+            "branch-id"
+          );
+
+
+        if (branchIdInput) {
+
+          branchIdInput.value =
+            "";
+
+        }
+
 
         console.log(
           "SHIPMENT SAVED SUCCESSFULLY:",
           shipment
         );
+
 
       } catch (error) {
 
@@ -766,6 +1162,7 @@ if (shipmentForm) {
           "RECEIVE GOODS ERROR:",
           error
         );
+
 
         if (formMessage) {
 
@@ -795,399 +1192,388 @@ if (shipmentForm) {
 
 
 /* =========================================================
-   SIDEBAR NAVIGATION
-   ========================================================= */
-
-document
-  .querySelectorAll(".nav-link")
-  .forEach(
-    function (button) {
-
-      button.addEventListener(
-        "click",
-        function () {
-
-          const pageName =
-            button.dataset.page;
-
-          document
-            .querySelectorAll(".page")
-            .forEach(
-              function (page) {
-
-                page.classList.remove(
-                  "active"
-                );
-
-              }
-            );
-
-          const selectedPage =
-            document.getElementById(
-              pageName
-            );
-
-          if (selectedPage) {
-
-            selectedPage.classList.add(
-              "active"
-            );
-
-          }
-
-          document
-            .querySelectorAll(".nav-link")
-            .forEach(
-              function (item) {
-
-                item.classList.remove(
-                  "active"
-                );
-
-              }
-            );
-
-          button.classList.add(
-            "active"
-          );
-
-        }
-      );
-
-    }
-  );
-
-
-/* =========================================================
-   RECEIVE GOODS BUTTON
-   ========================================================= */
-
-const receiveButton =
-  document.getElementById(
-    "receive-button"
-  );
-
-if (receiveButton) {
-
-  receiveButton.addEventListener(
-    "click",
-    function () {
-
-      document
-        .querySelectorAll(".page")
-        .forEach(
-          function (page) {
-
-            page.classList.remove(
-              "active"
-            );
-
-          }
-        );
-
-      const receivePage =
-        document.getElementById(
-          "receive"
-        );
-
-      if (receivePage) {
-
-        receivePage.classList.add(
-          "active"
-        );
-
-      }
-
-      document
-        .querySelectorAll(".nav-link")
-        .forEach(
-          function (item) {
-
-            item.classList.remove(
-              "active"
-            );
-
-          }
-        );
-
-      const receiveNav =
-        document.querySelector(
-          '[data-page="receive"]'
-        );
-
-      if (receiveNav) {
-
-        receiveNav.classList.add(
-          "active"
-        );
-
-      }
-
-    }
-  );
-
-}
-
-
-/* =========================================================
-   START APPLICATION
-   ========================================================= */
-
-if (accessToken) {
-
-  showApp();
-
-} else {
-
-  showLogin();
-
-}
-
-/* =========================================================
    SMART PARTY / BRANCH SEARCH
    ========================================================= */
 
-function normalizeUppercase(value) {
-  return value
-    .trim()
-    .replace(/\s+/g, " ")
-    .toUpperCase();
-}
-
-
-/* ---------------------------------------------------------
-   Generic smart search
-   --------------------------------------------------------- */
-
 function setupSmartSearch({
+
   inputId,
   hiddenId,
   suggestionsId,
   table,
   label
+
 }) {
 
-  const input = document.getElementById(inputId);
-  const hidden = document.getElementById(hiddenId);
-  const suggestions = document.getElementById(suggestionsId);
+  const input =
+    document.getElementById(
+      inputId
+    );
 
-  if (!input || !hidden || !suggestions) {
-    console.error("Smart search elements missing:", label);
+
+  const hidden =
+    document.getElementById(
+      hiddenId
+    );
+
+
+  const suggestions =
+    document.getElementById(
+      suggestionsId
+    );
+
+
+  if (
+    !input ||
+    !hidden ||
+    !suggestions
+  ) {
+
+    console.warn(
+      "SMART SEARCH ELEMENTS MISSING:",
+      label
+    );
+
     return;
+
   }
 
-  let searchTimer = null;
+
+  let searchTimer =
+    null;
 
 
   function hideSuggestions() {
-    suggestions.hidden = true;
-    suggestions.innerHTML = "";
+
+    suggestions.hidden =
+      true;
+
+    suggestions.innerHTML =
+      "";
+
   }
 
 
-  function showMessage(message) {
+  function showMessage(
+    message
+  ) {
 
-    suggestions.innerHTML = "";
-
-    const item = document.createElement("div");
-
-    item.className = "smart-suggestion";
-
-    item.textContent = message;
-
-    suggestions.appendChild(item);
-
-    suggestions.hidden = false;
-  }
+    suggestions.innerHTML =
+      "";
 
 
-  function showResults(rows, searchText) {
-
-    suggestions.innerHTML = "";
-
-    rows.forEach(function (row) {
-
-      const item = document.createElement("div");
-
-      item.className = "smart-suggestion";
-
-      const name = document.createElement("div");
-
-      name.className = "smart-suggestion-name";
-
-      name.textContent = row.name;
-
-      item.appendChild(name);
-
-
-      if (row.phone) {
-
-        const meta = document.createElement("div");
-
-        meta.className = "smart-suggestion-meta";
-
-        meta.textContent = row.phone;
-
-        item.appendChild(meta);
-
-      }
-
-
-      item.addEventListener("mousedown", function (event) {
-
-        event.preventDefault();
-
-        input.value = row.name;
-
-        hidden.value = row.id;
-
-        hideSuggestions();
-
-      });
-
-
-      suggestions.appendChild(item);
-
-    });
-
-
-    const createItem = document.createElement("div");
-
-    createItem.className = "smart-create";
-
-    createItem.textContent =
-      '+ ADD "' +
-      searchText +
-      '" AS NEW ' +
-      label.toUpperCase();
-
-
-    createItem.addEventListener("mousedown", function (event) {
-
-      event.preventDefault();
-
-      createNewRecord(
-        table,
-        label,
-        input,
-        hidden,
-        suggestions
+    const item =
+      document.createElement(
+        "div"
       );
 
-    });
+
+    item.className =
+      "smart-suggestion";
 
 
-    suggestions.appendChild(createItem);
+    item.textContent =
+      message;
 
-    suggestions.hidden = false;
+
+    suggestions.appendChild(
+      item
+    );
+
+
+    suggestions.hidden =
+      false;
+
+  }
+
+
+  function showResults(
+    rows,
+    searchText
+  ) {
+
+    suggestions.innerHTML =
+      "";
+
+
+    rows.forEach(
+      function (row) {
+
+        const item =
+          document.createElement(
+            "div"
+          );
+
+
+        item.className =
+          "smart-suggestion";
+
+
+        const name =
+          document.createElement(
+            "div"
+          );
+
+
+        name.className =
+          "smart-suggestion-name";
+
+
+        name.textContent =
+          row.name;
+
+
+        item.appendChild(
+          name
+        );
+
+
+        if (row.phone) {
+
+          const meta =
+            document.createElement(
+              "div"
+            );
+
+
+          meta.className =
+            "smart-suggestion-meta";
+
+
+          meta.textContent =
+            row.phone;
+
+
+          item.appendChild(
+            meta
+          );
+
+        }
+
+
+        item.addEventListener(
+          "mousedown",
+          function (event) {
+
+            event.preventDefault();
+
+
+            input.value =
+              row.name;
+
+
+            hidden.value =
+              row.id;
+
+
+            hideSuggestions();
+
+          }
+        );
+
+
+        suggestions.appendChild(
+          item
+        );
+
+      }
+    );
+
+
+    /*
+       Add new record option.
+    */
+
+    if (searchText) {
+
+      const createItem =
+        document.createElement(
+          "div"
+        );
+
+
+      createItem.className =
+        "smart-create";
+
+
+      createItem.textContent =
+        '+ ADD "' +
+        searchText +
+        '" AS NEW ' +
+        label.toUpperCase();
+
+
+      createItem.addEventListener(
+        "mousedown",
+        function (event) {
+
+          event.preventDefault();
+
+
+          createNewRecord(
+
+            table,
+            label,
+            input,
+            hidden,
+            suggestions
+
+          );
+
+        }
+      );
+
+
+      suggestions.appendChild(
+        createItem
+      );
+
+    }
+
+
+    suggestions.hidden =
+      false;
+
   }
 
 
   async function search() {
 
     const searchText =
-      normalizeUppercase(input.value);
+      normalizeUppercase(
+        input.value
+      );
 
-    hidden.value = "";
+
+    /*
+       If user changes the name,
+       remove the old ID.
+    */
+
+    hidden.value =
+      "";
+
 
     if (!searchText) {
 
       hideSuggestions();
 
       return;
+
     }
 
 
-    clearTimeout(searchTimer);
+    clearTimeout(
+      searchTimer
+    );
 
 
-    searchTimer = setTimeout(async function () {
+    searchTimer =
+      setTimeout(
+        async function () {
 
-      try {
+          try {
 
-        const token =
-          sessionStorage.getItem(
-            "chennai_access_token"
-          );
-
-
-        if (!token) {
-
-          showMessage("PLEASE SIGN IN AGAIN.");
-
-          return;
-        }
+            const token =
+              sessionStorage.getItem(
+                "chennai_access_token"
+              );
 
 
-        const response = await fetch(
-          SUPABASE_URL +
-          "/rest/v1/" +
-          table +
-          "?select=id,name,phone" +
-          "&name=ilike.*" +
-          encodeURIComponent(searchText) +
-          "*" +
-          "&is_active=eq.true" +
-          "&order=name.asc" +
-          "&limit=10",
-          {
+            if (!token) {
 
-            method: "GET",
+              showMessage(
+                "PLEASE SIGN IN AGAIN."
+              );
 
-            headers: {
-
-              "apikey": SUPABASE_KEY,
-
-              "Authorization":
-                "Bearer " + token
+              return;
 
             }
 
+
+            const response =
+              await fetch(
+
+                SUPABASE_URL +
+                "/rest/v1/" +
+                table +
+                "?select=id,name,phone" +
+                "&name=ilike.*" +
+                encodeURIComponent(
+                  searchText
+                ) +
+                "*" +
+                "&is_active=eq.true" +
+                "&order=name.asc" +
+                "&limit=10",
+
+                {
+
+                  method: "GET",
+
+                  headers: {
+
+                    "apikey":
+                      SUPABASE_KEY,
+
+                    "Authorization":
+                      "Bearer " +
+                      token
+
+                  }
+
+                }
+
+              );
+
+
+            const data =
+              await response.json();
+
+
+            if (!response.ok) {
+
+              console.error(
+                "SMART SEARCH ERROR:",
+                data
+              );
+
+
+              showMessage(
+                "UNABLE TO SEARCH " +
+                label.toUpperCase() +
+                "."
+              );
+
+
+              return;
+
+            }
+
+
+            showResults(
+              data || [],
+              searchText
+            );
+
+
+          } catch (error) {
+
+            console.error(
+              "SMART SEARCH ERROR:",
+              error
+            );
+
+
+            showMessage(
+              "SEARCH ERROR."
+            );
+
           }
-        );
 
-
-        const data =
-          await response.json();
-
-
-        if (!response.ok) {
-
-          console.error(
-            "Search error:",
-            data
-          );
-
-          showMessage(
-            "UNABLE TO SEARCH " +
-            label.toUpperCase() +
-            "."
-          );
-
-          return;
-        }
-
-
-        showResults(
-          data || [],
-          searchText
-        );
-
-
-      } catch (error) {
-
-        console.error(
-          "Smart search error:",
-          error
-        );
-
-        showMessage(
-          "SEARCH ERROR."
-        );
-
-      }
-
-    }, 250);
+        },
+        250
+      );
 
   }
 
@@ -1202,8 +1588,12 @@ function setupSmartSearch({
     "focus",
     function () {
 
-      if (input.value.trim()) {
+      if (
+        input.value.trim()
+      ) {
+
         search();
+
       }
 
     }
@@ -1238,16 +1628,18 @@ function setupSmartSearch({
 }
 
 
-/* ---------------------------------------------------------
+/* =========================================================
    CREATE NEW PARTY / BRANCH
-   --------------------------------------------------------- */
+   ========================================================= */
 
 async function createNewRecord(
+
   table,
   label,
   input,
   hidden,
   suggestions
+
 ) {
 
   const name =
@@ -1265,6 +1657,7 @@ async function createNewRecord(
     );
 
     return;
+
   }
 
 
@@ -1281,47 +1674,58 @@ async function createNewRecord(
     );
 
     return;
+
   }
 
 
   try {
 
-    suggestions.hidden = true;
+    suggestions.hidden =
+      true;
 
 
-    const response = await fetch(
-      SUPABASE_URL +
-      "/rest/v1/" +
-      table,
-      {
+    const response =
+      await fetch(
 
-        method: "POST",
+        SUPABASE_URL +
+        "/rest/v1/" +
+        table,
 
-        headers: {
+        {
 
-          "apikey": SUPABASE_KEY,
+          method: "POST",
 
-          "Authorization":
-            "Bearer " + token,
+          headers: {
 
-          "Content-Type":
-            "application/json",
+            "apikey":
+              SUPABASE_KEY,
 
-          "Prefer":
-            "return=representation"
+            "Authorization":
+              "Bearer " +
+              token,
 
-        },
+            "Content-Type":
+              "application/json",
 
-        body: JSON.stringify({
+            "Prefer":
+              "return=representation"
 
-          name: name,
+          },
 
-          is_active: true
+          body:
+            JSON.stringify({
 
-        })
+              name:
+                name,
 
-      }
-    );
+              is_active:
+                true
+
+            })
+
+        }
+
+      );
 
 
     const data =
@@ -1331,7 +1735,7 @@ async function createNewRecord(
     if (!response.ok) {
 
       console.error(
-        "Create error:",
+        "CREATE ERROR:",
         data
       );
 
@@ -1353,20 +1757,28 @@ async function createNewRecord(
       } else {
 
         alert(
+
           data.message ||
           data.error_description ||
+          data.details ||
           "UNABLE TO CREATE " +
           label.toUpperCase() +
           "."
+
         );
 
       }
 
+
       return;
+
     }
 
 
-    if (!data || !data.length) {
+    if (
+      !data ||
+      !data.length
+    ) {
 
       alert(
         label.toUpperCase() +
@@ -1374,6 +1786,7 @@ async function createNewRecord(
       );
 
       return;
+
     }
 
 
@@ -1383,6 +1796,7 @@ async function createNewRecord(
 
     input.value =
       created.name;
+
 
     hidden.value =
       created.id;
@@ -1400,12 +1814,35 @@ async function createNewRecord(
     );
 
 
+    /*
+       Refresh datalist in background.
+    */
+
+    if (
+      table === "parties"
+    ) {
+
+      loadParties();
+
+    }
+
+
+    if (
+      table === "branches"
+    ) {
+
+      loadBranches();
+
+    }
+
+
   } catch (error) {
 
     console.error(
-      "Create record error:",
+      "CREATE RECORD ERROR:",
       error
     );
+
 
     alert(
       "ERROR CREATING " +
@@ -1418,471 +1855,197 @@ async function createNewRecord(
 }
 
 
-/* ---------------------------------------------------------
+/* =========================================================
    START SMART SEARCH
-   --------------------------------------------------------- */
+   ========================================================= */
 
 setupSmartSearch({
 
-  inputId: "party-name",
+  inputId:
+    "party-name",
 
-  hiddenId: "party-id",
+  hiddenId:
+    "party-id",
 
   suggestionsId:
     "party-suggestions",
 
-  table: "parties",
+  table:
+    "parties",
 
-  label: "party"
+  label:
+    "party"
 
 });
 
 
 setupSmartSearch({
 
-  inputId: "branch-name",
+  inputId:
+    "branch-name",
 
-  hiddenId: "branch-id",
+  hiddenId:
+    "branch-id",
 
   suggestionsId:
     "branch-suggestions",
 
-  table: "branches",
+  table:
+    "branches",
 
-  label: "branch"
+  label:
+    "branch"
 
 });
+
+
 /* =========================================================
-   SAVE RECEIVE GOODS TO SUPABASE
+   SIDEBAR NAVIGATION
    ========================================================= */
 
-const shipmentForm =
-  document.getElementById("shipment-form");
+document
+  .querySelectorAll(
+    ".nav-link"
+  )
+  .forEach(
+    function (button) {
 
-if (shipmentForm) {
+      button.addEventListener(
+        "click",
+        function () {
 
-  shipmentForm.addEventListener(
-    "submit",
-    async function (event) {
+          const pageName =
+            button.dataset.page;
 
-      event.preventDefault();
 
-      const formMessage =
-        document.getElementById("form-message");
+          document
+            .querySelectorAll(
+              ".page"
+            )
+            .forEach(
+              function (page) {
 
-      const saveButton =
-        shipmentForm.querySelector(
-          'button[type="submit"]'
-        );
+                page.classList.remove(
+                  "active"
+                );
 
+              }
+            );
 
-      /* ---------------------------------------------------
-         GET VALUES
-         --------------------------------------------------- */
 
-      const receivedDate =
-        document.getElementById(
-          "received-date"
-        ).value;
+          const selectedPage =
+            document.getElementById(
+              pageName
+            );
 
-      const lrNumber =
-        normalizeUppercase(
-          document.getElementById(
-            "lr-number"
-          ).value
-        );
 
-      const partyName =
-        normalizeUppercase(
-          document.getElementById(
-            "party-name"
-          ).value
-        );
+          if (selectedPage) {
 
-      const partyId =
-        document.getElementById(
-          "party-id"
-        ).value;
-
-      const branchName =
-        normalizeUppercase(
-          document.getElementById(
-            "branch-name"
-          ).value
-        );
-
-      const branchId =
-        document.getElementById(
-          "branch-id"
-        ).value;
-
-      const quantity =
-        document.getElementById(
-          "quantity"
-        ).value;
-
-      const amount =
-        document.getElementById(
-          "amount"
-        ).value;
-
-      const paymentType =
-        document.getElementById(
-          "payment-type"
-        ).value;
-
-      const remarks =
-        normalizeUppercase(
-          document.getElementById(
-            "remarks"
-          ).value
-        );
-
-
-      /* ---------------------------------------------------
-         VALIDATION
-         --------------------------------------------------- */
-
-      if (!receivedDate) {
-
-        formMessage.textContent =
-          "PLEASE SELECT RECEIVED DATE.";
-
-        return;
-      }
-
-
-      if (!lrNumber) {
-
-        formMessage.textContent =
-          "PLEASE ENTER LR NUMBER.";
-
-        return;
-      }
-
-
-      if (!partyId) {
-
-        formMessage.textContent =
-          "PLEASE SELECT AN EXISTING PARTY OR CREATE A NEW PARTY.";
-
-        return;
-      }
-
-
-      if (!partyName) {
-
-        formMessage.textContent =
-          "PLEASE ENTER PARTY NAME.";
-
-        return;
-      }
-
-
-      if (!branchId) {
-
-        formMessage.textContent =
-          "PLEASE SELECT AN EXISTING BRANCH OR CREATE A NEW BRANCH.";
-
-        return;
-      }
-
-
-      if (!branchName) {
-
-        formMessage.textContent =
-          "PLEASE ENTER FROM BRANCH.";
-
-        return;
-      }
-
-
-      if (!quantity || Number(quantity) <= 0) {
-
-        formMessage.textContent =
-          "PLEASE ENTER A VALID QUANTITY.";
-
-        return;
-      }
-
-
-      if (
-        amount === "" ||
-        Number(amount) < 0
-      ) {
-
-        formMessage.textContent =
-          "PLEASE ENTER A VALID AMOUNT.";
-
-        return;
-      }
-
-
-      if (
-        !["TOPAY", "TBB", "PAID"]
-          .includes(paymentType)
-      ) {
-
-        formMessage.textContent =
-          "PLEASE SELECT A VALID PAYMENT TYPE.";
-
-        return;
-      }
-
-
-      /* ---------------------------------------------------
-         LOGIN TOKEN
-         --------------------------------------------------- */
-
-      const token =
-        sessionStorage.getItem(
-          "chennai_access_token"
-        );
-
-
-      if (!token) {
-
-        formMessage.textContent =
-          "YOUR LOGIN SESSION HAS EXPIRED. PLEASE SIGN IN AGAIN.";
-
-        showLogin();
-
-        return;
-      }
-
-
-      /* ---------------------------------------------------
-         PREPARE BUTTON
-         --------------------------------------------------- */
-
-      saveButton.disabled = true;
-
-      saveButton.textContent =
-        "SAVING...";
-
-      formMessage.textContent =
-        "SAVING GOODS RECEIPT...";
-
-
-      try {
-
-        /* -------------------------------------------------
-           INSERT SHIPMENT
-           ------------------------------------------------- */
-
-        const response =
-          await fetch(
-            SUPABASE_URL +
-            "/rest/v1/shipments",
-            {
-
-              method: "POST",
-
-              headers: {
-
-                "apikey":
-                  SUPABASE_KEY,
-
-                "Authorization":
-                  "Bearer " + token,
-
-                "Content-Type":
-                  "application/json",
-
-                "Prefer":
-                  "return=representation"
-
-              },
-
-              body: JSON.stringify({
-
-                received_date:
-                  receivedDate,
-
-                lr_number:
-                  lrNumber,
-
-                party_id:
-                  partyId,
-
-                quantity:
-                  Number(quantity),
-
-                amount:
-                  Number(amount),
-
-                payment_type:
-                  paymentType,
-
-                from_branch_id:
-                  branchId,
-
-                remarks:
-                  remarks || null
-
-              })
-
-            }
-          );
-
-
-        const data =
-          await response.json();
-
-
-        console.log(
-          "SHIPMENT RESPONSE:",
-          data
-        );
-
-
-        /* -------------------------------------------------
-           ERROR
-           ------------------------------------------------- */
-
-        if (!response.ok) {
-
-          console.error(
-            "SHIPMENT SAVE ERROR:",
-            data
-          );
-
-
-          let errorMessage =
-            "UNABLE TO SAVE GOODS RECEIPT.";
-
-
-          if (data && data.message) {
-
-            errorMessage =
-              data.message;
-
-          } else if (
-            data &&
-            data.details
-          ) {
-
-            errorMessage =
-              data.details;
-
-          } else if (
-            data &&
-            data.hint
-          ) {
-
-            errorMessage =
-              data.hint;
+            selectedPage.classList.add(
+              "active"
+            );
 
           }
 
 
-          formMessage.textContent =
-            errorMessage;
+          document
+            .querySelectorAll(
+              ".nav-link"
+            )
+            .forEach(
+              function (item) {
 
-          return;
+                item.classList.remove(
+                  "active"
+                );
+
+              }
+            );
+
+
+          button.classList.add(
+            "active"
+          );
+
         }
+      );
+
+    }
+  );
 
 
-        /* -------------------------------------------------
-           SUCCESS
-           ------------------------------------------------- */
+/* =========================================================
+   RECEIVE GOODS BUTTON
+   ========================================================= */
 
-        if (
-          !data ||
-          !Array.isArray(data) ||
-          data.length === 0
-        ) {
-
-          formMessage.textContent =
-            "SAVE RESPONSE WAS EMPTY. PLEASE CHECK SUPABASE.";
-
-          return;
-        }
+const receiveButton =
+  document.getElementById(
+    "receive-button"
+  );
 
 
-        const shipment =
-          data[0];
+if (receiveButton) {
 
+  receiveButton.addEventListener(
+    "click",
+    function () {
 
-        console.log(
-          "SHIPMENT SAVED SUCCESSFULLY:",
-          shipment
+      document
+        .querySelectorAll(
+          ".page"
+        )
+        .forEach(
+          function (page) {
+
+            page.classList.remove(
+              "active"
+            );
+
+          }
         );
 
 
-        formMessage.textContent =
-          "RECEIVE GOODS SAVED SUCCESSFULLY.";
-
-
-        /* -------------------------------------------------
-           RESET FORM
-           ------------------------------------------------- */
-
-        shipmentForm.reset();
-
-
+      const receivePage =
         document.getElementById(
-          "party-id"
-        ).value = "";
-
-
-        document.getElementById(
-          "branch-id"
-        ).value = "";
-
-
-        /*
-         * Keep the success message after reset.
-         */
-
-        formMessage.textContent =
-          "RECEIVE GOODS SAVED SUCCESSFULLY — SERIAL NO. " +
-          shipment.serial_no;
-
-
-        /* -------------------------------------------------
-           OPTIONAL DASHBOARD REFRESH
-           ------------------------------------------------- */
-
-        if (
-          typeof loadDashboard ===
-          "function"
-        ) {
-
-          await loadDashboard();
-
-        }
-
-        if (
-          typeof loadShipments ===
-          "function"
-        ) {
-
-          await loadShipments();
-
-        }
-
-
-      } catch (error) {
-
-        console.error(
-          "SHIPMENT SAVE EXCEPTION:",
-          error
+          "receive"
         );
 
 
-        formMessage.textContent =
-          "ERROR SAVING GOODS RECEIPT: " +
-          error.message;
+      if (receivePage) {
+
+        receivePage.classList.add(
+          "active"
+        );
+
+      }
 
 
-      } finally {
+      document
+        .querySelectorAll(
+          ".nav-link"
+        )
+        .forEach(
+          function (item) {
 
-        saveButton.disabled =
-          false;
+            item.classList.remove(
+              "active"
+            );
 
-        saveButton.textContent =
-          "Save goods receipt";
+          }
+        );
+
+
+      const receiveNav =
+        document.querySelector(
+          '[data-page="receive"]'
+        );
+
+
+      if (receiveNav) {
+
+        receiveNav.classList.add(
+          "active"
+        );
 
       }
 
@@ -1890,3 +2053,23 @@ if (shipmentForm) {
   );
 
 }
+
+
+/* =========================================================
+   START APPLICATION
+   ========================================================= */
+
+if (accessToken) {
+
+  showApp();
+
+} else {
+
+  showLogin();
+
+}
+
+
+/* =========================================================
+   END OF APP.JS
+   ========================================================= */
