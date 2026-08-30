@@ -21,7 +21,21 @@ function showPage(page){document.querySelectorAll('.page').forEach(x=>x.classLis
 function resetForm(){editingId=null;const f=$('#shipment-form');f.reset();f.received_date.value=today();f.querySelector('[type=submit]').textContent='Save goods receipt';$('#form-message').textContent=''}
 function editShipment(s){editingId=s.id;const f=$('#shipment-form');['received_date','lr_number','party_name','branch_name','quantity','amount','payment_type','remarks'].forEach(k=>f.elements[k].value=s[k]??'');f.querySelector('[type=submit]').textContent='Save changes';showPage('receive')}
 async function cloudAction(fn){try{await fn();await load()}catch(e){alert(e.message)}}
-$('#login-form').addEventListener('submit',async e=>{e.preventDefault();const msg=$('#login-message'),password=$('#login-password').value;msg.textContent='Signing in…';try{const r=await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`,{method:'POST',headers:{apikey:SUPABASE_KEY,'Content-Type':'application/json'},body:JSON.stringify({email:OFFICE_EMAIL,password})});const d=await r.json();if(!r.ok){msg.textContent=d.error_description||'Sign-in failed.';return}token=d.access_token;sessionStorage.setItem(sessionKey,token);$('#login-screen').hidden=true;$('#app-shell').hidden=false;load().catch(e=>alert(e.message))}catch(error){msg.textContent='Unable to reach Supabase. Check the internet connection and try again.'}});
+$('#login-form').addEventListener('submit',async e=>{e.preventDefault();const msg=$('#login-message'),password=$('#login-password').value;msg.textContent='Signing in…';try{const r=await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`,{method:'POST',headers:{apikey:SUPABASE_KEY,'Content-Type':'application/json'},body:JSON.stringify({email:OFFICE_EMAIL,password})});const d=await r.json();if(!r.ok){msg.textContent=d.error_description||'Sign-in failed.';return}token=d.access_token;sessionStorage.setItem(sessionKey,token);$('#login-screen').style.display='none';
+$('#app-shell').style.display='block';
+
+load().catch(e=>{
+    console.error('Dashboard loading failed:', e);
+    $('#login-message').textContent='Login successful, but dashboard could not load.';
+});}catch(error){msg.textContent='Unable to reach Supabase. Check the internet connection and try agaif(token){
+    $('#login-screen').style.display='none';
+    $('#app-shell').style.display='block';
+
+    load().catch(e=>{
+        console.error('Dashboard loading failed:', e);
+        $('#sign-out').click();
+    });
+}in.'}});
 $('#sign-out').addEventListener('click',()=>{token=null;sessionStorage.removeItem(sessionKey);$('#app-shell').hidden=true;$('#login-screen').hidden=false;$('#login-password').value=''});
 document.querySelectorAll('.nav-link').forEach(b=>b.addEventListener('click',()=>{if(b.dataset.page==='receive')resetForm();showPage(b.dataset.page)}));document.querySelectorAll('[data-go]').forEach(b=>b.addEventListener('click',()=>showPage(b.dataset.go)));$('#receive-button').addEventListener('click',()=>{resetForm();showPage('receive')});resetForm();
 $('#shipment-form').addEventListener('submit',e=>cloudAction(async()=>{e.preventDefault();const d=Object.fromEntries(new FormData(e.target)),party_id=await getOrCreate('parties',d.party_name.trim()),from_branch_id=await getOrCreate('branches',d.branch_name.trim());const payload={received_date:d.received_date,lr_number:d.lr_number.trim(),party_id,from_branch_id,quantity:Number(d.quantity),amount:Number(d.amount),payment_type:d.payment_type,remarks:d.remarks||null};if(editingId)await api(`shipments?id=eq.${editingId}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});else await api('shipments',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify([payload])});resetForm();$('#form-message').textContent='Saved to cloud.'}));
