@@ -413,44 +413,64 @@
               </div>
 
 
-              <div class="field">
+              <div class="field smart-field">
 
-                <label for="party-name">
-                  Party name
-                </label>
+  <label for="party-name">
+    Party name
+  </label>
 
-                <input
-                  id="party-name"
-                  name="party_name"
-                  type="text"
-                  list="party-list"
-                  placeholder="Enter party name"
-                  required
-                >
+  <input
+    id="party-name"
+    name="party_name"
+    type="text"
+    placeholder="TYPE PARTY NAME..."
+    autocomplete="off"
+    required
+  >
 
-                <datalist id="party-list"></datalist>
+  <input
+    id="party-id"
+    type="hidden"
+    name="party_id"
+  >
 
-              </div>
+  <div
+    id="party-suggestions"
+    class="smart-suggestions"
+    hidden
+  ></div>
+
+</div>
 
 
-              <div class="field">
+              <div class="field smart-field">
 
-                <label for="branch-name">
-                  From branch
-                </label>
+  <label for="branch-name">
+    From branch
+  </label>
 
-                <input
-                  id="branch-name"
-                  name="branch_name"
-                  type="text"
-                  list="branch-list"
-                  placeholder="Enter branch"
-                  required
-                >
+  <input
+    id="branch-name"
+    name="branch_name"
+    type="text"
+    placeholder="TYPE BRANCH NAME..."
+    autocomplete="off"
+    required
+  >
 
-                <datalist id="branch-list"></datalist>
+  <input
+    id="branch-id"
+    type="hidden"
+    name="branch_id"
+  >
 
-              </div>
+  <div
+    id="branch-suggestions"
+    class="smart-suggestions"
+    hidden
+  ></div>
+
+</div>
 
 
               <div class="field">
@@ -497,24 +517,7 @@
                   Payment type
                 </label>
 
-                <select
-                  id="payment-type"
-                  name="payment_type"
-                >
-
-                  <option value="TOPAY">
-                    To Pay
-                  </option>
-
-                  <option value="PAID">
-                    Paid
-                  </option>
-
-                  <option value="FOC">
-                    FOC
-                  </option>
-
-                </select>
+                
 
               </div>
 
@@ -531,7 +534,14 @@
                   rows="3"
                   placeholder="Optional remarks"
                 ></textarea>
-
+<select
+  id="payment-type"
+  name="payment_type"
+>
+  <option value="TOPAY">TO PAY</option>
+  <option value="TBB">TBB</option>
+  <option value="PAID">PAID</option>
+</select>
               </div>
 
             </div>
