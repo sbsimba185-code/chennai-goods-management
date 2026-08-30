@@ -1,74 +1,820 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
+
   <title>Chennai Goods Management</title>
-  <link rel="stylesheet" href="styles.css" />
-  <link rel="stylesheet" href="extras.css" />
-  <link rel="stylesheet" href="cloud.css" />
+
+  <link
+    rel="stylesheet"
+    href="style.css"
+  >
 </head>
+
 <body>
-  <section id="login-screen" class="login-screen">
-    <form id="login-form" class="login-card">
-      <span class="brand-mark">CG</span>
-      <p class="eyebrow">CHENNAI GOODS MANAGEMENT</p>
-      <h1>Welcome back</h1>
-      <p>Sign in to access the Chennai goods register.</p>
-      <label>Username<input value="silambarasan2453@gmail.com" readonly aria-readonly="true" /></label>
-      <label>Password<input id="login-password" type="password" required autocomplete="current-password" /></label>
-      <button class="primary" type="submit">Sign in</button>
-      <p id="login-message" class="login-message"></p>
-    </form>
-  </section>
-  <div id="app-shell" hidden>
-  <aside class="sidebar">
-    <div class="brand"><span class="brand-mark">CG</span><span>Chennai Goods<small>Management</small></span></div>
-    <nav>
-      <button class="nav-link active" data-page="dashboard">Overview</button>
-      <button class="nav-link" data-page="receive">Receive goods</button>
-      <button class="nav-link" data-page="delivery">Pending delivery <span id="delivery-count" class="count"></span></button>
-      <button class="nav-link" data-page="accounts">Accounts pending <span id="accounts-count" class="count"></span></button>
-      <button class="nav-link" data-page="stock">Godown stock check</button>
-      <button class="nav-link" data-page="all">All shipments</button>
-    </nav>
-    <p class="side-note">Chennai branch<br><span>Internal goods register</span></p>
-  </aside>
-  <main>
-    <header><div><p class="eyebrow" id="page-kicker">CHENNAI BRANCH</p><h1 id="page-title">Good morning</h1></div><div class="header-actions"><button id="sign-out" class="secondary">Sign out</button><button id="receive-button" class="primary">+ Receive goods</button></div></header>
 
-    <section id="dashboard" class="page active">
-      <div class="stats">
-        <article><span class="icon blue">↓</span><p>Received today</p><strong id="stat-received">0</strong></article>
-        <article><span class="icon amber">!</span><p>Pending delivery</p><strong id="stat-delivery">0</strong></article>
-        <article><span class="icon violet">₹</span><p>Accounts pending</p><strong id="stat-accounts">0</strong></article>
-        <article><span class="icon green">✓</span><p>Completed today</p><strong id="stat-completed">0</strong></article>
+  <!-- =====================================================
+       LOGIN
+       ===================================================== -->
+
+  <section
+    id="login-screen"
+    class="login-screen"
+  >
+
+    <div class="login-card">
+
+      <div class="brand-mark">
+        CG
       </div>
-      <section class="panel recent"><div class="panel-head"><div><h2>Recent shipments</h2><p>Latest goods received at Chennai</p></div><button class="text-button" data-go="all">View all</button></div><div id="recent-table"></div></section>
-    </section>
 
-    <section id="receive" class="page">
-      <div class="section-heading"><h2>Receive goods</h2><p>Enter the actual business date. New party and branch names are saved automatically.</p></div>
-      <form id="shipment-form" class="form-card">
-        <label>Received date<input type="date" name="received_date" required /></label>
-        <label>LR number<input type="text" name="lr_number" placeholder="Example: TPTN/08/2250" required /></label>
-        <label>Party name<input type="text" name="party_name" list="party-list" placeholder="Search or enter a new party" required /><datalist id="party-list"></datalist></label>
-        <label>From branch<input type="text" name="branch_name" list="branch-list" placeholder="Search or enter a new branch" required /><datalist id="branch-list"></datalist></label>
-        <label>Quantity<input type="number" name="quantity" min="0.01" step="0.01" required /></label>
-        <label>Amount<input type="number" name="amount" min="0" step="0.01" required /></label>
-        <label>Payment type<select name="payment_type" required><option value="TOPAY">TOPAY</option><option value="TBB">TBB</option><option value="PAID">PAID</option></select></label>
-        <label class="wide">Remarks<textarea name="remarks" rows="3" placeholder="Optional notes"></textarea></label>
-        <div class="wide form-actions"><button class="primary" type="submit">Save goods receipt</button><span id="form-message"></span></div>
+      <div class="login-heading">
+
+        <p class="eyebrow">
+          CHENNAI BRANCH
+        </p>
+
+        <h1>
+          Goods Management
+        </h1>
+
+        <p>
+          Sign in to manage received goods.
+        </p>
+
+      </div>
+
+
+      <form id="login-form">
+
+        <label for="login-email">
+          Email
+        </label>
+
+        <input
+          id="login-email"
+          type="email"
+          value="silambarasan2453@gmail.com"
+          readonly
+        >
+
+
+        <label for="login-password">
+          Password
+        </label>
+
+        <input
+          id="login-password"
+          type="password"
+          autocomplete="current-password"
+          placeholder="Enter your password"
+          required
+        >
+
+
+        <button
+          type="submit"
+          class="primary-button"
+          id="login-button"
+        >
+          Sign in
+        </button>
+
+
+        <p
+          id="login-message"
+          class="form-message"
+          aria-live="polite"
+        ></p>
+
       </form>
-    </section>
 
-    <section id="delivery" class="page"><div class="section-heading"><h2>Pending delivery</h2><p>Goods waiting for customer collection.</p></div><div class="panel"><div class="toolbar"><input class="search" data-search="delivery" placeholder="Search LR, party, or branch" /></div><div id="delivery-table"></div></div></section>
-    <section id="accounts" class="page"><div class="section-heading"><h2>Accounts pending</h2><p>Delivered goods waiting for an A/C date.</p></div><div class="panel"><div class="toolbar"><input class="search" data-search="accounts" placeholder="Search LR, party, or branch" /></div><div id="accounts-table"></div></div></section>
-    <section id="stock" class="page"><div class="section-heading"><h2>Godown stock check</h2><p>Check every undelivered item physically in the godown. Each check is saved with today’s date.</p></div><div class="panel"><div class="toolbar"><input class="search" data-search="stock" placeholder="Search LR, party, or branch" /></div><div id="stock-table"></div></div></section>
-    <section id="all" class="page"><div class="section-heading"><h2>All shipments</h2><p>Search the full Chennai goods register.</p></div><div class="panel"><div class="toolbar"><input class="search" data-search="all" placeholder="Search LR, party, or branch" /></div><div id="all-table"></div></div></section>
-  </main>
-  <dialog id="date-dialog"><form method="dialog" id="date-form"><button class="close" value="cancel" aria-label="Close">×</button><h2 id="dialog-title">Mark delivered</h2><p id="dialog-detail"></p><label id="date-label">Delivery date<input id="action-date" type="date" required /></label><div class="form-actions"><button value="cancel" class="secondary">Cancel</button><button id="confirm-action" class="primary" value="default">Save</button></div></form></dialog>
+    </div>
+
+  </section>
+
+
+  <!-- =====================================================
+       APPLICATION
+       ===================================================== -->
+
+  <div
+    id="app-shell"
+    hidden
+  >
+
+    <!-- SIDEBAR -->
+
+    <aside class="sidebar">
+
+      <div class="sidebar-brand">
+
+        <div class="brand-mark">
+          CG
+        </div>
+
+        <div>
+          <strong>
+            Goods Management
+          </strong>
+
+          <span>
+            Chennai Branch
+          </span>
+        </div>
+
+      </div>
+
+
+      <nav class="navigation">
+
+        <button
+          class="nav-link active"
+          data-page="dashboard"
+          type="button"
+        >
+          <span>Dashboard</span>
+        </button>
+
+
+        <button
+          class="nav-link"
+          data-page="receive"
+          type="button"
+        >
+          <span>Receive Goods</span>
+        </button>
+
+
+        <button
+          class="nav-link"
+          data-page="delivery"
+          type="button"
+        >
+          <span>Delivery</span>
+
+          <span
+            id="delivery-count"
+            class="nav-count"
+          ></span>
+        </button>
+
+
+        <button
+          class="nav-link"
+          data-page="accounts"
+          type="button"
+        >
+          <span>Accounts</span>
+
+          <span
+            id="accounts-count"
+            class="nav-count"
+          ></span>
+        </button>
+
+
+        <button
+          class="nav-link"
+          data-page="all"
+          type="button"
+        >
+          <span>All Shipments</span>
+        </button>
+
+      </nav>
+
+
+      <div class="sidebar-footer">
+
+        <div class="branch-label">
+          <span class="status-dot"></span>
+          Chennai branch
+        </div>
+
+        <button
+          id="sign-out"
+          class="sign-out-button"
+          type="button"
+        >
+          Sign out
+        </button>
+
+      </div>
+
+    </aside>
+
+
+    <!-- MAIN -->
+
+    <main class="main-content">
+
+      <!-- TOP BAR -->
+
+      <header class="topbar">
+
+        <div>
+
+          <p
+            id="page-kicker"
+            class="eyebrow"
+          >
+            CHENNAI BRANCH
+          </p>
+
+          <h1 id="page-title">
+            Good morning
+          </h1>
+
+        </div>
+
+
+        <button
+          id="receive-button"
+          class="primary-button"
+          type="button"
+        >
+          + Receive goods
+        </button>
+
+      </header>
+
+
+      <!-- =================================================
+           DASHBOARD
+           ================================================= -->
+
+      <section
+        id="dashboard"
+        class="page active"
+      >
+
+        <div class="stats-grid">
+
+          <article class="stat-card">
+
+            <span>
+              Received today
+            </span>
+
+            <strong id="stat-received">
+              0
+            </strong>
+
+          </article>
+
+
+          <article class="stat-card">
+
+            <span>
+              Pending delivery
+            </span>
+
+            <strong id="stat-delivery">
+              0
+            </strong>
+
+          </article>
+
+
+          <article class="stat-card">
+
+            <span>
+              Accounts pending
+            </span>
+
+            <strong id="stat-accounts">
+              0
+            </strong>
+
+          </article>
+
+
+          <article class="stat-card">
+
+            <span>
+              Completed today
+            </span>
+
+            <strong id="stat-completed">
+              0
+            </strong>
+
+          </article>
+
+        </div>
+
+
+        <div class="section-card">
+
+          <div class="section-heading">
+
+            <div>
+
+              <p class="eyebrow">
+                LATEST ACTIVITY
+              </p>
+
+              <h2>
+                Recent shipments
+              </h2>
+
+            </div>
+
+            <button
+              class="text-button"
+              data-go="all"
+              type="button"
+            >
+              View all
+            </button>
+
+          </div>
+
+
+          <div id="recent-table"></div>
+
+        </div>
+
+      </section>
+
+
+      <!-- =================================================
+           RECEIVE GOODS
+           ================================================= -->
+
+      <section
+        id="receive"
+        class="page"
+      >
+
+        <div class="section-card form-card">
+
+          <div class="section-heading">
+
+            <div>
+
+              <p class="eyebrow">
+                NEW GOODS ENTRY
+              </p>
+
+              <h2>
+                Receive goods
+              </h2>
+
+              <p>
+                Enter the goods received from another branch.
+              </p>
+
+            </div>
+
+          </div>
+
+
+          <form id="shipment-form">
+
+            <div class="form-grid">
+
+              <div class="field">
+
+                <label for="received-date">
+                  Received date
+                </label>
+
+                <input
+                  id="received-date"
+                  name="received_date"
+                  type="date"
+                  required
+                >
+
+              </div>
+
+
+              <div class="field">
+
+                <label for="lr-number">
+                  LR number
+                </label>
+
+                <input
+                  id="lr-number"
+                  name="lr_number"
+                  type="text"
+                  placeholder="Enter LR number"
+                  required
+                >
+
+              </div>
+
+
+              <div class="field">
+
+                <label for="party-name">
+                  Party name
+                </label>
+
+                <input
+                  id="party-name"
+                  name="party_name"
+                  type="text"
+                  list="party-list"
+                  placeholder="Enter party name"
+                  required
+                >
+
+                <datalist id="party-list"></datalist>
+
+              </div>
+
+
+              <div class="field">
+
+                <label for="branch-name">
+                  From branch
+                </label>
+
+                <input
+                  id="branch-name"
+                  name="branch_name"
+                  type="text"
+                  list="branch-list"
+                  placeholder="Enter branch"
+                  required
+                >
+
+                <datalist id="branch-list"></datalist>
+
+              </div>
+
+
+              <div class="field">
+
+                <label for="quantity">
+                  Quantity
+                </label>
+
+                <input
+                  id="quantity"
+                  name="quantity"
+                  type="number"
+                  min="1"
+                  step="1"
+                  placeholder="0"
+                  required
+                >
+
+              </div>
+
+
+              <div class="field">
+
+                <label for="amount">
+                  Amount
+                </label>
+
+                <input
+                  id="amount"
+                  name="amount"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="0.00"
+                  required
+                >
+
+              </div>
+
+
+              <div class="field">
+
+                <label for="payment-type">
+                  Payment type
+                </label>
+
+                <select
+                  id="payment-type"
+                  name="payment_type"
+                >
+
+                  <option value="TOPAY">
+                    To Pay
+                  </option>
+
+                  <option value="PAID">
+                    Paid
+                  </option>
+
+                  <option value="FOC">
+                    FOC
+                  </option>
+
+                </select>
+
+              </div>
+
+
+              <div class="field field-wide">
+
+                <label for="remarks">
+                  Remarks
+                </label>
+
+                <textarea
+                  id="remarks"
+                  name="remarks"
+                  rows="3"
+                  placeholder="Optional remarks"
+                ></textarea>
+
+              </div>
+
+            </div>
+
+
+            <div class="form-footer">
+
+              <p
+                id="form-message"
+                class="form-message"
+                aria-live="polite"
+              ></p>
+
+              <button
+                type="submit"
+                class="primary-button"
+              >
+                Save goods receipt
+              </button>
+
+            </div>
+
+          </form>
+
+        </div>
+
+      </section>
+
+
+      <!-- =================================================
+           DELIVERY
+           ================================================= -->
+
+      <section
+        id="delivery"
+        class="page"
+      >
+
+        <div class="section-card">
+
+          <div class="section-heading">
+
+            <div>
+
+              <p class="eyebrow">
+                PENDING DELIVERY
+              </p>
+
+              <h2>
+                Delivery
+              </h2>
+
+              <p>
+                Goods received at Chennai and waiting for delivery.
+              </p>
+
+            </div>
+
+            <input
+              class="search-input"
+              data-search="delivery"
+              type="search"
+              placeholder="Search LR, party..."
+            >
+
+          </div>
+
+
+          <div id="delivery-table"></div>
+
+        </div>
+
+      </section>
+
+
+      <!-- =================================================
+           ACCOUNTS
+           ================================================= -->
+
+      <section
+        id="accounts"
+        class="page"
+      >
+
+        <div class="section-card">
+
+          <div class="section-heading">
+
+            <div>
+
+              <p class="eyebrow">
+                ACCOUNTS PENDING
+              </p>
+
+              <h2>
+                Accounts
+              </h2>
+
+              <p>
+                Delivered goods waiting to be entered in accounts.
+              </p>
+
+            </div>
+
+            <input
+              class="search-input"
+              data-search="accounts"
+              type="search"
+              placeholder="Search LR, party..."
+            >
+
+          </div>
+
+
+          <div id="accounts-table"></div>
+
+        </div>
+
+      </section>
+
+
+      <!-- =================================================
+           ALL SHIPMENTS
+           ================================================= -->
+
+      <section
+        id="all"
+        class="page"
+      >
+
+        <div class="section-card">
+
+          <div class="section-heading">
+
+            <div>
+
+              <p class="eyebrow">
+                CHENNAI BRANCH
+              </p>
+
+              <h2>
+                All shipments
+              </h2>
+
+              <p>
+                Complete goods movement history.
+              </p>
+
+            </div>
+
+            <input
+              class="search-input"
+              data-search="all"
+              type="search"
+              placeholder="Search shipments..."
+            >
+
+          </div>
+
+
+          <div id="all-table"></div>
+
+        </div>
+
+      </section>
+
+
+      <!-- =================================================
+           STOCK
+           ================================================= -->
+
+      <section
+        id="stock"
+        class="page"
+      >
+
+        <div class="section-card">
+
+          <div class="section-heading">
+
+            <div>
+
+              <p class="eyebrow">
+                GODOWN
+              </p>
+
+              <h2>
+                Godown stock
+              </h2>
+
+            </div>
+
+          </div>
+
+
+          <div id="stock-table">
+
+            <p class="empty">
+              Stock verification will be added later.
+            </p>
+
+          </div>
+
+        </div>
+
+      </section>
+
+    </main>
+
   </div>
-  <script type="module" src="app.js"></script>
+
+
+  <!-- =====================================================
+       DATE DIALOG
+       ===================================================== -->
+
+  <dialog id="date-dialog">
+
+    <form
+      id="date-form"
+      method="dialog"
+      class="dialog-card"
+    >
+
+      <div class="dialog-heading">
+
+        <p class="eyebrow">
+          UPDATE SHIPMENT
+        </p>
+
+        <h2 id="dialog-title">
+          Enter date
+        </h2>
+
+        <p id="dialog-detail"></p>
+
+      </div>
+
+
+      <div class="field">
+
+        <label id="date-label">
+          Date
+        </label>
+
+        <input
+          id="action-date"
+          type="date"
+          required
+        >
+
+      </div>
+
+
+      <div class="dialog-actions">
+
+        <button
+          type="submit"
+          name="cancel"
+          value="cancel"
+          class="secondary-button"
+        >
+          Cancel
+        </button>
+
+        <button
+          type="submit"
+          class="primary-button"
+        >
+          Save date
+        </button>
+
+      </div>
+
+    </form>
+
+  </dialog>
+
+
+  <script
+    type="module"
+    src="app.js"
+  ></script>
+
 </body>
 </html>
