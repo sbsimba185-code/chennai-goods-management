@@ -1452,3 +1452,441 @@ setupSmartSearch({
   label: "branch"
 
 });
+/* =========================================================
+   SAVE RECEIVE GOODS TO SUPABASE
+   ========================================================= */
+
+const shipmentForm =
+  document.getElementById("shipment-form");
+
+if (shipmentForm) {
+
+  shipmentForm.addEventListener(
+    "submit",
+    async function (event) {
+
+      event.preventDefault();
+
+      const formMessage =
+        document.getElementById("form-message");
+
+      const saveButton =
+        shipmentForm.querySelector(
+          'button[type="submit"]'
+        );
+
+
+      /* ---------------------------------------------------
+         GET VALUES
+         --------------------------------------------------- */
+
+      const receivedDate =
+        document.getElementById(
+          "received-date"
+        ).value;
+
+      const lrNumber =
+        normalizeUppercase(
+          document.getElementById(
+            "lr-number"
+          ).value
+        );
+
+      const partyName =
+        normalizeUppercase(
+          document.getElementById(
+            "party-name"
+          ).value
+        );
+
+      const partyId =
+        document.getElementById(
+          "party-id"
+        ).value;
+
+      const branchName =
+        normalizeUppercase(
+          document.getElementById(
+            "branch-name"
+          ).value
+        );
+
+      const branchId =
+        document.getElementById(
+          "branch-id"
+        ).value;
+
+      const quantity =
+        document.getElementById(
+          "quantity"
+        ).value;
+
+      const amount =
+        document.getElementById(
+          "amount"
+        ).value;
+
+      const paymentType =
+        document.getElementById(
+          "payment-type"
+        ).value;
+
+      const remarks =
+        normalizeUppercase(
+          document.getElementById(
+            "remarks"
+          ).value
+        );
+
+
+      /* ---------------------------------------------------
+         VALIDATION
+         --------------------------------------------------- */
+
+      if (!receivedDate) {
+
+        formMessage.textContent =
+          "PLEASE SELECT RECEIVED DATE.";
+
+        return;
+      }
+
+
+      if (!lrNumber) {
+
+        formMessage.textContent =
+          "PLEASE ENTER LR NUMBER.";
+
+        return;
+      }
+
+
+      if (!partyId) {
+
+        formMessage.textContent =
+          "PLEASE SELECT AN EXISTING PARTY OR CREATE A NEW PARTY.";
+
+        return;
+      }
+
+
+      if (!partyName) {
+
+        formMessage.textContent =
+          "PLEASE ENTER PARTY NAME.";
+
+        return;
+      }
+
+
+      if (!branchId) {
+
+        formMessage.textContent =
+          "PLEASE SELECT AN EXISTING BRANCH OR CREATE A NEW BRANCH.";
+
+        return;
+      }
+
+
+      if (!branchName) {
+
+        formMessage.textContent =
+          "PLEASE ENTER FROM BRANCH.";
+
+        return;
+      }
+
+
+      if (!quantity || Number(quantity) <= 0) {
+
+        formMessage.textContent =
+          "PLEASE ENTER A VALID QUANTITY.";
+
+        return;
+      }
+
+
+      if (
+        amount === "" ||
+        Number(amount) < 0
+      ) {
+
+        formMessage.textContent =
+          "PLEASE ENTER A VALID AMOUNT.";
+
+        return;
+      }
+
+
+      if (
+        !["TOPAY", "TBB", "PAID"]
+          .includes(paymentType)
+      ) {
+
+        formMessage.textContent =
+          "PLEASE SELECT A VALID PAYMENT TYPE.";
+
+        return;
+      }
+
+
+      /* ---------------------------------------------------
+         LOGIN TOKEN
+         --------------------------------------------------- */
+
+      const token =
+        sessionStorage.getItem(
+          "chennai_access_token"
+        );
+
+
+      if (!token) {
+
+        formMessage.textContent =
+          "YOUR LOGIN SESSION HAS EXPIRED. PLEASE SIGN IN AGAIN.";
+
+        showLogin();
+
+        return;
+      }
+
+
+      /* ---------------------------------------------------
+         PREPARE BUTTON
+         --------------------------------------------------- */
+
+      saveButton.disabled = true;
+
+      saveButton.textContent =
+        "SAVING...";
+
+      formMessage.textContent =
+        "SAVING GOODS RECEIPT...";
+
+
+      try {
+
+        /* -------------------------------------------------
+           INSERT SHIPMENT
+           ------------------------------------------------- */
+
+        const response =
+          await fetch(
+            SUPABASE_URL +
+            "/rest/v1/shipments",
+            {
+
+              method: "POST",
+
+              headers: {
+
+                "apikey":
+                  SUPABASE_KEY,
+
+                "Authorization":
+                  "Bearer " + token,
+
+                "Content-Type":
+                  "application/json",
+
+                "Prefer":
+                  "return=representation"
+
+              },
+
+              body: JSON.stringify({
+
+                received_date:
+                  receivedDate,
+
+                lr_number:
+                  lrNumber,
+
+                party_id:
+                  partyId,
+
+                quantity:
+                  Number(quantity),
+
+                amount:
+                  Number(amount),
+
+                payment_type:
+                  paymentType,
+
+                from_branch_id:
+                  branchId,
+
+                remarks:
+                  remarks || null
+
+              })
+
+            }
+          );
+
+
+        const data =
+          await response.json();
+
+
+        console.log(
+          "SHIPMENT RESPONSE:",
+          data
+        );
+
+
+        /* -------------------------------------------------
+           ERROR
+           ------------------------------------------------- */
+
+        if (!response.ok) {
+
+          console.error(
+            "SHIPMENT SAVE ERROR:",
+            data
+          );
+
+
+          let errorMessage =
+            "UNABLE TO SAVE GOODS RECEIPT.";
+
+
+          if (data && data.message) {
+
+            errorMessage =
+              data.message;
+
+          } else if (
+            data &&
+            data.details
+          ) {
+
+            errorMessage =
+              data.details;
+
+          } else if (
+            data &&
+            data.hint
+          ) {
+
+            errorMessage =
+              data.hint;
+
+          }
+
+
+          formMessage.textContent =
+            errorMessage;
+
+          return;
+        }
+
+
+        /* -------------------------------------------------
+           SUCCESS
+           ------------------------------------------------- */
+
+        if (
+          !data ||
+          !Array.isArray(data) ||
+          data.length === 0
+        ) {
+
+          formMessage.textContent =
+            "SAVE RESPONSE WAS EMPTY. PLEASE CHECK SUPABASE.";
+
+          return;
+        }
+
+
+        const shipment =
+          data[0];
+
+
+        console.log(
+          "SHIPMENT SAVED SUCCESSFULLY:",
+          shipment
+        );
+
+
+        formMessage.textContent =
+          "RECEIVE GOODS SAVED SUCCESSFULLY.";
+
+
+        /* -------------------------------------------------
+           RESET FORM
+           ------------------------------------------------- */
+
+        shipmentForm.reset();
+
+
+        document.getElementById(
+          "party-id"
+        ).value = "";
+
+
+        document.getElementById(
+          "branch-id"
+        ).value = "";
+
+
+        /*
+         * Keep the success message after reset.
+         */
+
+        formMessage.textContent =
+          "RECEIVE GOODS SAVED SUCCESSFULLY — SERIAL NO. " +
+          shipment.serial_no;
+
+
+        /* -------------------------------------------------
+           OPTIONAL DASHBOARD REFRESH
+           ------------------------------------------------- */
+
+        if (
+          typeof loadDashboard ===
+          "function"
+        ) {
+
+          await loadDashboard();
+
+        }
+
+        if (
+          typeof loadShipments ===
+          "function"
+        ) {
+
+          await loadShipments();
+
+        }
+
+
+      } catch (error) {
+
+        console.error(
+          "SHIPMENT SAVE EXCEPTION:",
+          error
+        );
+
+
+        formMessage.textContent =
+          "ERROR SAVING GOODS RECEIPT: " +
+          error.message;
+
+
+      } finally {
+
+        saveButton.disabled =
+          false;
+
+        saveButton.textContent =
+          "Save goods receipt";
+
+      }
+
+    }
+  );
+
+}
