@@ -1,8 +1,7 @@
 /* =========================================================
    CHENNAI GOODS MANAGEMENT
-   APP.JS
+   COMPLETE APP.JS
    ========================================================= */
-
 
 /* =========================================================
    SUPABASE CONFIGURATION
@@ -14,48 +13,187 @@ const SUPABASE_URL =
 const SUPABASE_KEY =
   "sb_publishable_EC6Tm1kbWuPEPtfeeJED9Q_6dbqOZVh";
 
+const OFFICE_EMAIL =
+  "silambarasan2453@gmail.com";
 
-/* =========================================================
-   ELEMENTS
-   ========================================================= */
-
-const loginForm =
-  document.getElementById("login-form");
-
-const loginButton =
-  document.getElementById("login-button");
-
-const loginMessage =
-  document.getElementById("login-message");
-
-const loginScreen =
-  document.getElementById("login-screen");
-
-const appShell =
-  document.getElementById("app-shell");
-
-const shipmentForm =
-  document.getElementById("shipment-form");
-
-const formMessage =
-  document.getElementById("form-message");
+const SESSION_KEY =
+  "chennai-goods-session";
 
 
 /* =========================================================
-   ACCESS TOKEN
+   APPLICATION STATE
    ========================================================= */
 
 let accessToken =
-  sessionStorage.getItem(
-    "chennai_access_token"
-  );
+  sessionStorage.getItem(SESSION_KEY);
+
+let shipments = [];
+
+let currentAction = null;
+
+let editingShipmentId = null;
 
 
 /* =========================================================
-   SHOW LOGIN
+   SHORT HELPERS
+   ========================================================= */
+
+const $ = (selector) =>
+  document.querySelector(selector);
+
+
+function today() {
+  return new Date()
+    .toISOString()
+    .slice(0, 10);
+}
+
+
+function normalizeUppercase(value) {
+  return String(value || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toUpperCase();
+}
+
+
+function safe(value) {
+  return String(value ?? "")
+    .replace(/[&<>"']/g, function (character) {
+      return {
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;"
+      }[character];
+    });
+}
+
+
+function formatDate(value) {
+
+  if (!value) {
+    return "—";
+  }
+
+  return new Intl.DateTimeFormat(
+    "en-IN",
+    {
+      day: "2-digit",
+      month: "long",
+      year: "numeric"
+    }
+  ).format(
+    new Date(`${value}T00:00:00`)
+  );
+}
+
+
+function statusOf(shipment) {
+
+  if (shipment.accounts_date) {
+    return "Completed";
+  }
+
+  if (shipment.delivery_date) {
+    return "Accounts pending";
+  }
+
+  return "Pending delivery";
+}
+
+
+/* =========================================================
+   SUPABASE API
+   ========================================================= */
+
+function authHeaders(extra = {}) {
+
+  return {
+    apikey: SUPABASE_KEY,
+    Authorization:
+      `Bearer ${accessToken}`,
+    ...extra
+  };
+}
+
+
+async function api(
+  path,
+  options = {}
+) {
+
+  const response =
+    await fetch(
+      `${SUPABASE_URL}/rest/v1/${path}`,
+      {
+        ...options,
+
+        headers:
+          authHeaders(
+            options.headers || {}
+          )
+      }
+    );
+
+
+  if (!response.ok) {
+
+    const body =
+      await response
+        .json()
+        .catch(() => ({}));
+
+
+    throw new Error(
+      body.message ||
+      body.details ||
+      body.hint ||
+      body.error ||
+      `SUPABASE ERROR (${response.status})`
+    );
+  }
+
+
+  if (response.status === 204) {
+    return null;
+  }
+
+
+  const text =
+    await response.text();
+
+
+  if (!text) {
+    return null;
+  }
+
+
+  try {
+
+    return JSON.parse(text);
+
+  } catch {
+
+    return null;
+
+  }
+}
+
+
+/* =========================================================
+   LOGIN SCREEN
    ========================================================= */
 
 function showLogin() {
+
+  const loginScreen =
+    $("#login-screen");
+
+  const appShell =
+    $("#app-shell");
+
 
   if (loginScreen) {
 
@@ -64,21 +202,24 @@ function showLogin() {
 
   }
 
+
   if (appShell) {
 
     appShell.hidden = true;
     appShell.style.display = "none";
 
   }
-
 }
 
 
-/* =========================================================
-   SHOW APP
-   ========================================================= */
-
 function showApp() {
+
+  const loginScreen =
+    $("#login-screen");
+
+  const appShell =
+    $("#app-shell");
+
 
   if (loginScreen) {
 
@@ -87,58 +228,23 @@ function showApp() {
 
   }
 
+
   if (appShell) {
 
     appShell.hidden = false;
     appShell.style.display = "block";
 
   }
-
-  loadParties();
-  loadBranches();
-
-}
-
-
-/* =========================================================
-   SUPABASE HEADERS
-   ========================================================= */
-
-function supabaseHeaders() {
-
-  return {
-
-    "apikey":
-      SUPABASE_KEY,
-
-    "Authorization":
-      "Bearer " + accessToken,
-
-    "Content-Type":
-      "application/json"
-
-  };
-
-}
-
-
-/* =========================================================
-   UPPERCASE NORMALIZATION
-   ========================================================= */
-
-function normalizeUppercase(value) {
-
-  return String(value || "")
-    .trim()
-    .replace(/\s+/g, " ")
-    .toUpperCase();
-
 }
 
 
 /* =========================================================
    LOGIN
    ========================================================= */
+
+const loginForm =
+  $("#login-form");
+
 
 if (loginForm) {
 
@@ -149,77 +255,62 @@ if (loginForm) {
       event.preventDefault();
 
 
-      const email =
-        document
-          .getElementById("login-email")
-          .value
-          .trim();
+      const loginMessage =
+        $("#login-message");
+
+      const loginButton =
+        $("#login-button");
 
 
       const password =
-        document
-          .getElementById("login-password")
+        $("#login-password")
           .value;
 
 
       if (!password) {
 
         loginMessage.textContent =
-          "Please enter your password.";
+          "PLEASE ENTER YOUR PASSWORD.";
 
         return;
-
       }
 
 
       loginButton.disabled = true;
 
       loginButton.textContent =
-        "Signing in...";
+        "SIGNING IN...";
 
       loginMessage.textContent =
-        "Please wait...";
+        "PLEASE WAIT...";
 
 
       try {
 
         const response =
           await fetch(
-
-            SUPABASE_URL +
-            "/auth/v1/token?grant_type=password",
-
+            `${SUPABASE_URL}/auth/v1/token?grant_type=password`,
             {
-
               method: "POST",
 
               headers: {
-
-                "apikey":
-                  SUPABASE_KEY,
-
+                apikey: SUPABASE_KEY,
                 "Content-Type":
                   "application/json"
-
               },
 
               body: JSON.stringify({
-
-                email:
-                  email,
-
-                password:
-                  password
-
+                email: OFFICE_EMAIL,
+                password: password
               })
-
             }
-
           );
 
 
         const data =
-          await response.json();
+          await response
+            .json()
+            .catch(() => ({}));
 
 
         console.log(
@@ -228,26 +319,17 @@ if (loginForm) {
         );
 
 
-        if (!response.ok) {
+        if (
+          !response.ok ||
+          !data.access_token
+        ) {
 
-          throw new Error(
-
+          loginMessage.textContent =
             data.error_description ||
             data.msg ||
-            data.message ||
-            "Login failed."
+            "SIGN-IN FAILED. CHECK YOUR PASSWORD.";
 
-          );
-
-        }
-
-
-        if (!data.access_token) {
-
-          throw new Error(
-            "No login token was returned."
-          );
-
+          return;
         }
 
 
@@ -256,34 +338,44 @@ if (loginForm) {
 
 
         sessionStorage.setItem(
-          "chennai_access_token",
+          SESSION_KEY,
           accessToken
         );
-
-
-        loginMessage.textContent =
-          "";
 
 
         showApp();
 
 
-        console.log(
-          "LOGIN SUCCESSFUL"
-        );
+        try {
 
+          await loadShipments();
+
+          showPage("dashboard");
+
+          loginMessage.textContent =
+            "";
+
+        } catch (error) {
+
+          console.error(
+            "DASHBOARD LOAD ERROR:",
+            error
+          );
+
+          loginMessage.textContent =
+            "LOGIN SUCCEEDED, BUT DATA COULD NOT LOAD. CHECK SUPABASE POLICIES.";
+
+        }
 
       } catch (error) {
 
         console.error(
-          "LOGIN ERROR:",
+          "LOGIN CONNECTION ERROR:",
           error
         );
 
-
         loginMessage.textContent =
-          error.message;
-
+          "COULD NOT CONNECT TO SUPABASE.";
 
       } finally {
 
@@ -291,7 +383,7 @@ if (loginForm) {
           false;
 
         loginButton.textContent =
-          "Sign in";
+          "SIGN IN";
 
       }
 
@@ -306,9 +398,7 @@ if (loginForm) {
    ========================================================= */
 
 const signOutButton =
-  document.getElementById(
-    "sign-out"
-  );
+  $("#sign-out");
 
 
 if (signOutButton) {
@@ -319,22 +409,24 @@ if (signOutButton) {
 
       accessToken = null;
 
-
       sessionStorage.removeItem(
-        "chennai_access_token"
+        SESSION_KEY
       );
 
 
-      const passwordInput =
-        document.getElementById(
-          "login-password"
-        );
+      const password =
+        $("#login-password");
+
+      if (password) {
+        password.value = "";
+      }
 
 
-      if (passwordInput) {
+      const loginMessage =
+        $("#login-message");
 
-        passwordInput.value = "";
-
+      if (loginMessage) {
+        loginMessage.textContent = "";
       }
 
 
@@ -347,226 +439,97 @@ if (signOutButton) {
 
 
 /* =========================================================
-   LOAD PARTIES
+   LOAD SHIPMENTS
    ========================================================= */
 
-async function loadParties() {
+async function loadShipments() {
 
-  const partyList =
-    document.getElementById(
-      "party-list"
+  const select =
+    [
+      "*",
+      "parties(name)",
+      "branches(name)",
+      "stock_checks(checked_date,check_status)"
+    ].join(",");
+
+
+  const query =
+    new URLSearchParams({
+      select: select,
+      order: "created_at.desc"
+    });
+
+
+  const rows =
+    await api(
+      `shipments?${query.toString()}`
     );
 
 
-  if (!partyList) {
+  shipments =
+    (rows || []).map(
+      function (shipment) {
 
-    return;
-
-  }
-
-
-  if (!accessToken) {
-
-    return;
-
-  }
+        const checks =
+          Array.isArray(
+            shipment.stock_checks
+          )
+            ? [...shipment.stock_checks]
+            : [];
 
 
-  try {
+        checks.sort(
+          function (a, b) {
 
-    const response =
-      await fetch(
+            return String(
+              b.checked_date || ""
+            ).localeCompare(
+              String(
+                a.checked_date || ""
+              )
+            );
 
-        SUPABASE_URL +
-        "/rest/v1/parties" +
-        "?select=id,name,phone" +
-        "&is_active=eq.true" +
-        "&order=name.asc",
-
-        {
-
-          method: "GET",
-
-          headers:
-            supabaseHeaders()
-
-        }
-
-      );
-
-
-    const data =
-      await response.json();
-
-
-    if (!response.ok) {
-
-      console.error(
-        "PARTY LOAD ERROR:",
-        data
-      );
-
-      return;
-
-    }
-
-
-    partyList.innerHTML =
-      "";
-
-
-    data.forEach(
-      function (party) {
-
-        const option =
-          document.createElement(
-            "option"
-          );
-
-
-        option.value =
-          party.name;
-
-
-        partyList.appendChild(
-          option
+          }
         );
+
+
+        const latestCheck =
+          checks[0];
+
+
+        return {
+
+          ...shipment,
+
+          party_name:
+            shipment.parties?.name || "",
+
+          branch_name:
+            shipment.branches?.name || "",
+
+          stock_status:
+            latestCheck?.check_status ||
+            null,
+
+          stock_checked_date:
+            latestCheck?.checked_date ||
+            null
+
+        };
 
       }
     );
 
 
-    console.log(
-      "PARTIES LOADED:",
-      data.length
-    );
-
-
-  } catch (error) {
-
-    console.error(
-      "PARTY LOAD ERROR:",
-      error
-    );
-
-  }
-
+  render();
 }
 
 
 /* =========================================================
-   LOAD BRANCHES
+   FIND OR CREATE PARTY
    ========================================================= */
 
-async function loadBranches() {
-
-  const branchList =
-    document.getElementById(
-      "branch-list"
-    );
-
-
-  if (!branchList) {
-
-    return;
-
-  }
-
-
-  if (!accessToken) {
-
-    return;
-
-  }
-
-
-  try {
-
-    const response =
-      await fetch(
-
-        SUPABASE_URL +
-        "/rest/v1/branches" +
-        "?select=id,name,phone" +
-        "&is_active=eq.true" +
-        "&order=name.asc",
-
-        {
-
-          method: "GET",
-
-          headers:
-            supabaseHeaders()
-
-        }
-
-      );
-
-
-    const data =
-      await response.json();
-
-
-    if (!response.ok) {
-
-      console.error(
-        "BRANCH LOAD ERROR:",
-        data
-      );
-
-      return;
-
-    }
-
-
-    branchList.innerHTML =
-      "";
-
-
-    data.forEach(
-      function (branch) {
-
-        const option =
-          document.createElement(
-            "option"
-          );
-
-
-        option.value =
-          branch.name;
-
-
-        branchList.appendChild(
-          option
-        );
-
-      }
-    );
-
-
-    console.log(
-      "BRANCHES LOADED:",
-      data.length
-    );
-
-
-  } catch (error) {
-
-    console.error(
-      "BRANCH LOAD ERROR:",
-      error
-    );
-
-  }
-
-}
-
-
-/* =========================================================
-   FIND PARTY ID
-   ========================================================= */
-
-async function findPartyId(
+async function getOrCreateParty(
   partyName
 ) {
 
@@ -576,71 +539,85 @@ async function findPartyId(
     );
 
 
-  const url =
-    SUPABASE_URL +
-    "/rest/v1/parties" +
-    "?select=id,name" +
-    "&name=eq." +
-    encodeURIComponent(name) +
-    "&is_active=eq.true" +
-    "&limit=1";
+  if (!name) {
+
+    throw new Error(
+      "PLEASE ENTER PARTY NAME."
+    );
+
+  }
 
 
-  const response =
-    await fetch(
+  const query =
+    new URLSearchParams({
+      select: "id,name",
+      name: `eq.${name}`,
+      limit: "1"
+    });
 
-      url,
 
+  const existing =
+    await api(
+      `parties?${query.toString()}`
+    );
+
+
+  if (
+    existing &&
+    existing.length
+  ) {
+
+    return existing[0].id;
+
+  }
+
+
+  const created =
+    await api(
+      "parties",
       {
+        method: "POST",
 
-        method: "GET",
+        headers: {
+          "Content-Type":
+            "application/json",
 
-        headers:
-          supabaseHeaders()
+          Prefer:
+            "return=representation"
+        },
 
+        body: JSON.stringify([
+          {
+            name: name,
+            is_active: true
+          }
+        ])
       }
-
     );
 
 
-  const data =
-    await response.json();
-
-
-  if (!response.ok) {
-
-    console.error(
-      "PARTY LOOKUP ERROR:",
-      data
-    );
-
+  if (
+    !created ||
+    !created.length ||
+    !created[0].id
+  ) {
 
     throw new Error(
-      "Could not find party."
+      "PARTY COULD NOT BE CREATED."
     );
 
   }
 
 
-  if (!data.length) {
-
-    throw new Error(
-      "PARTY NOT FOUND. PLEASE SELECT OR CREATE THE PARTY."
-    );
-
-  }
-
-
-  return data[0].id;
-
+  return created[0].id;
 }
 
 
 /* =========================================================
-   FIND BRANCH ID
+   FIND OR CREATE BRANCH
    ========================================================= */
 
-async function findBranchId(
+async function getOrCreateBranch(
   branchName
 ) {
 
@@ -650,404 +627,1071 @@ async function findBranchId(
     );
 
 
-  const url =
-    SUPABASE_URL +
-    "/rest/v1/branches" +
-    "?select=id,name" +
-    "&name=eq." +
-    encodeURIComponent(name) +
-    "&is_active=eq.true" +
-    "&limit=1";
+  if (!name) {
+
+    throw new Error(
+      "PLEASE ENTER FROM BRANCH."
+    );
+
+  }
 
 
-  const response =
-    await fetch(
+  const query =
+    new URLSearchParams({
+      select: "id,name",
+      name: `eq.${name}`,
+      limit: "1"
+    });
 
-      url,
 
+  const existing =
+    await api(
+      `branches?${query.toString()}`
+    );
+
+
+  if (
+    existing &&
+    existing.length
+  ) {
+
+    return existing[0].id;
+
+  }
+
+
+  const created =
+    await api(
+      "branches",
       {
-
-        method: "GET",
-
-        headers:
-          supabaseHeaders()
-
-      }
-
-    );
-
-
-  const data =
-    await response.json();
-
-
-  if (!response.ok) {
-
-    console.error(
-      "BRANCH LOOKUP ERROR:",
-      data
-    );
-
-
-    throw new Error(
-      "Could not find branch."
-    );
-
-  }
-
-
-  if (!data.length) {
-
-    throw new Error(
-      "BRANCH NOT FOUND. PLEASE SELECT OR CREATE THE BRANCH."
-    );
-
-  }
-
-
-  return data[0].id;
-
-}
-
-
-/* =========================================================
-   SAVE SHIPMENT
-   ========================================================= */
-
-async function saveShipment() {
-
-  const receivedDate =
-    document.getElementById(
-      "received-date"
-    ).value;
-
-
-  const lrNumber =
-    normalizeUppercase(
-      document.getElementById(
-        "lr-number"
-      ).value
-    );
-
-
-  const partyName =
-    normalizeUppercase(
-      document.getElementById(
-        "party-name"
-      ).value
-    );
-
-
-  const branchName =
-    normalizeUppercase(
-      document.getElementById(
-        "branch-name"
-      ).value
-    );
-
-
-  const quantity =
-    document.getElementById(
-      "quantity"
-    ).value;
-
-
-  const amount =
-    document.getElementById(
-      "amount"
-    ).value;
-
-
-  const paymentType =
-    document.getElementById(
-      "payment-type"
-    ).value;
-
-
-  const remarks =
-    normalizeUppercase(
-      document.getElementById(
-        "remarks"
-      ).value
-    );
-
-
-  /* -------------------------------------------------------
-     VALIDATION
-     ------------------------------------------------------- */
-
-  if (!receivedDate) {
-
-    throw new Error(
-      "PLEASE SELECT THE RECEIVED DATE."
-    );
-
-  }
-
-
-  if (!lrNumber) {
-
-    throw new Error(
-      "PLEASE ENTER THE LR NUMBER."
-    );
-
-  }
-
-
-  if (!partyName) {
-
-    throw new Error(
-      "PLEASE SELECT OR CREATE A PARTY."
-    );
-
-  }
-
-
-  if (!branchName) {
-
-    throw new Error(
-      "PLEASE SELECT OR CREATE THE FROM BRANCH."
-    );
-
-  }
-
-
-  if (
-    !quantity ||
-    Number(quantity) <= 0
-  ) {
-
-    throw new Error(
-      "QUANTITY MUST BE GREATER THAN ZERO."
-    );
-
-  }
-
-
-  if (
-    amount === "" ||
-    Number(amount) < 0
-  ) {
-
-    throw new Error(
-      "AMOUNT CANNOT BE NEGATIVE."
-    );
-
-  }
-
-
-  if (
-    ![
-      "TOPAY",
-      "TBB",
-      "PAID"
-    ].includes(paymentType)
-  ) {
-
-    throw new Error(
-      "INVALID PAYMENT TYPE."
-    );
-
-  }
-
-
-  /* -------------------------------------------------------
-     FOREIGN KEYS
-     ------------------------------------------------------- */
-
-  const partyId =
-    await findPartyId(
-      partyName
-    );
-
-
-  const branchId =
-    await findBranchId(
-      branchName
-    );
-
-
-  /* -------------------------------------------------------
-     INSERT SHIPMENT
-     ------------------------------------------------------- */
-
-  const shipmentResponse =
-    await fetch(
-
-      SUPABASE_URL +
-      "/rest/v1/shipments",
-
-      {
-
         method: "POST",
 
         headers: {
+          "Content-Type":
+            "application/json",
 
-          ...supabaseHeaders(),
-
-          "Prefer":
+          Prefer:
             "return=representation"
-
         },
 
-        body:
-          JSON.stringify({
-
-            received_date:
-              receivedDate,
-
-            lr_number:
-              lrNumber,
-
-            party_id:
-              partyId,
-
-            quantity:
-              Number(quantity),
-
-            amount:
-              Number(amount),
-
-            payment_type:
-              paymentType,
-
-            from_branch_id:
-              branchId,
-
-            delivery_date:
-              null,
-
-            accounts_date:
-              null,
-
-            remarks:
-              remarks || null
-
-          })
-
+        body: JSON.stringify([
+          {
+            name: name,
+            is_active: true
+          }
+        ])
       }
-
     );
-
-
-  const shipmentData =
-    await shipmentResponse.json();
-
-
-  if (!shipmentResponse.ok) {
-
-    console.error(
-      "SHIPMENT SAVE ERROR:",
-      shipmentData
-    );
-
-
-    throw new Error(
-
-      shipmentData.message ||
-      shipmentData.details ||
-      shipmentData.hint ||
-      shipmentData.error ||
-      "SUPABASE COULD NOT SAVE THE SHIPMENT."
-
-    );
-
-  }
 
 
   if (
-    !Array.isArray(shipmentData) ||
-    !shipmentData.length
+    !created ||
+    !created.length ||
+    !created[0].id
   ) {
 
     throw new Error(
-      "SHIPMENT SAVE RESPONSE WAS EMPTY."
+      "BRANCH COULD NOT BE CREATED."
     );
 
   }
 
 
-  const shipment =
-    shipmentData[0];
-
-
-  /* -------------------------------------------------------
-     CREATE RECEIVED EVENT
-     ------------------------------------------------------- */
-
-  const eventResponse =
-    await fetch(
-
-      SUPABASE_URL +
-      "/rest/v1/shipment_events",
-
-      {
-
-        method: "POST",
-
-        headers: {
-
-          ...supabaseHeaders(),
-
-          "Prefer":
-            "return=minimal"
-
-        },
-
-        body:
-          JSON.stringify({
-
-            shipment_id:
-              shipment.id,
-
-            event_type:
-              "RECEIVED",
-
-            event_date:
-              receivedDate,
-
-            notes:
-              remarks || null
-
-          })
-
-      }
-
-    );
-
-
-  if (!eventResponse.ok) {
-
-    const eventError =
-      await eventResponse.text();
-
-
-    console.error(
-      "RECEIVED EVENT ERROR:",
-      eventError
-    );
-
-
-    /*
-       Shipment itself has already been saved.
-       We report the event problem separately.
-    */
-
-    console.warn(
-      "SHIPMENT SAVED BUT RECEIVED EVENT FAILED."
-    );
-
-  }
-
-
-  return shipment;
-
+  return created[0].id;
 }
 
 
 /* =========================================================
-   RECEIVE GOODS FORM
+   TABLE BUTTON
    ========================================================= */
+
+function actionButton(
+  type,
+  shipment,
+  label,
+  className = ""
+) {
+
+  return `
+    <button
+      type="button"
+      class="action ${className}"
+      data-action="${type}"
+      data-id="${safe(shipment.id)}"
+    >
+      ${safe(label)}
+    </button>
+  `;
+}
+
+
+/* =========================================================
+   SHIPMENT ROW
+   ========================================================= */
+
+function shipmentRow(
+  shipment,
+  mode
+) {
+
+  const status =
+    statusOf(shipment);
+
+
+  let statusClass =
+    "pending";
+
+
+  if (status === "Completed") {
+    statusClass = "completed";
+  }
+
+  if (status === "Accounts pending") {
+    statusClass = "accounts";
+  }
+
+
+  let actions = "";
+
+
+  if (mode === "workflow") {
+
+    if (
+      status ===
+      "Pending delivery"
+    ) {
+
+      actions =
+        actionButton(
+          "deliver",
+          shipment,
+          "DELIVERY"
+        );
+
+    } else if (
+      status ===
+      "Accounts pending"
+    ) {
+
+      actions =
+        actionButton(
+          "accounts",
+          shipment,
+          "ENTER A/C DATE"
+        ) +
+
+        actionButton(
+          "undelivered",
+          shipment,
+          "MARK UNDELIVERED",
+          "light"
+        );
+
+    }
+
+  }
+
+
+  if (mode === "all") {
+
+    if (
+      status !==
+      "Pending delivery"
+    ) {
+
+      actions +=
+        actionButton(
+          "undelivered",
+          shipment,
+          "MARK UNDELIVERED",
+          "light"
+        );
+
+    }
+
+
+    actions +=
+      actionButton(
+        "edit",
+        shipment,
+        "EDIT",
+        "light"
+      );
+
+
+    actions +=
+      actionButton(
+        "delete",
+        shipment,
+        "DELETE",
+        "danger"
+      );
+
+  }
+
+
+  return `
+    <tr>
+
+      <td>
+        <b>
+          ${safe(shipment.lr_number)}
+        </b>
+      </td>
+
+      <td>
+        ${safe(shipment.party_name)}
+      </td>
+
+      <td>
+        ${safe(shipment.branch_name)}
+      </td>
+
+      <td>
+        ${safe(shipment.quantity)}
+      </td>
+
+      <td>
+        ₹${Number(
+          shipment.amount || 0
+        ).toLocaleString("en-IN")}
+      </td>
+
+      <td>
+        ${safe(
+          shipment.remarks
+        ) || "—"}
+      </td>
+
+      <td>
+        ${formatDate(
+          shipment.delivery_date
+        )}
+      </td>
+
+      <td>
+        ${formatDate(
+          shipment.accounts_date
+        )}
+      </td>
+
+      <td>
+        ${formatDate(
+          shipment.received_date
+        )}
+      </td>
+
+      <td>
+        <span
+          class="badge ${statusClass}"
+        >
+          ${status}
+        </span>
+      </td>
+
+      ${
+        mode
+          ? `
+            <td class="actions">
+              ${actions}
+            </td>
+          `
+          : ""
+      }
+
+    </tr>
+  `;
+}
+
+
+/* =========================================================
+   SHIPMENT TABLE
+   ========================================================= */
+
+function renderTable(
+  data,
+  target,
+  mode = false
+) {
+
+  const element =
+    $(target);
+
+
+  if (!element) {
+    return;
+  }
+
+
+  const headers = `
+    <th>LR NO.</th>
+    <th>PARTY</th>
+    <th>FROM</th>
+    <th>QTY</th>
+    <th>AMOUNT</th>
+    <th>REMARKS</th>
+    <th>DELIVERY DATE</th>
+    <th>A/C DATE</th>
+    <th>RECEIVED</th>
+    <th>STATUS</th>
+    ${
+      mode
+        ? "<th>ACTIONS</th>"
+        : ""
+    }
+  `;
+
+
+  if (
+    !data ||
+    !data.length
+  ) {
+
+    element.innerHTML =
+      `<p class="empty">
+        NO SHIPMENTS FOUND.
+      </p>`;
+
+    return;
+  }
+
+
+  element.innerHTML = `
+
+    <div class="table-wrap">
+
+      <table>
+
+        <thead>
+          <tr>
+            ${headers}
+          </tr>
+        </thead>
+
+        <tbody>
+
+          ${data
+            .map(
+              function (shipment) {
+                return shipmentRow(
+                  shipment,
+                  mode
+                );
+              }
+            )
+            .join("")}
+
+        </tbody>
+
+      </table>
+
+    </div>
+
+  `;
+}
+
+
+/* =========================================================
+   STOCK TABLE
+   ========================================================= */
+
+function renderStockTable(
+  data
+) {
+
+  const element =
+    $("#stock-table");
+
+
+  if (!element) {
+    return;
+  }
+
+
+  if (
+    !data ||
+    !data.length
+  ) {
+
+    element.innerHTML =
+      `<p class="empty">
+        THERE ARE NO UNDELIVERED GOODS TO CHECK.
+      </p>`;
+
+    return;
+  }
+
+
+  element.innerHTML = `
+
+    <div class="table-wrap">
+
+      <table>
+
+        <thead>
+
+          <tr>
+
+            <th>LR NO.</th>
+
+            <th>PARTY</th>
+
+            <th>FROM</th>
+
+            <th>QTY</th>
+
+            <th>REMARKS</th>
+
+            <th>LAST CHECK</th>
+
+            <th>GODOWN STATUS</th>
+
+            <th>ACTIONS</th>
+
+          </tr>
+
+        </thead>
+
+        <tbody>
+
+          ${data
+            .map(
+              function (shipment) {
+
+                const status =
+                  shipment.stock_status;
+
+
+                const statusHtml =
+                  status
+                    ? `
+                      <span
+                        class="badge ${
+                          status ===
+                          "IN GODOWN"
+                            ? "completed"
+                            : "pending"
+                        }"
+                      >
+                        ${
+                          status ===
+                          "IN GODOWN"
+                            ? "IN GODOWN"
+                            : "NOT FOUND"
+                        }
+                      </span>
+                    `
+                    : `
+                      <span class="muted">
+                        NOT CHECKED
+                      </span>
+                    `;
+
+
+                return `
+
+                  <tr>
+
+                    <td>
+                      <b>
+                        ${safe(
+                          shipment.lr_number
+                        )}
+                      </b>
+                    </td>
+
+                    <td>
+                      ${safe(
+                        shipment.party_name
+                      )}
+                    </td>
+
+                    <td>
+                      ${safe(
+                        shipment.branch_name
+                      )}
+                    </td>
+
+                    <td>
+                      ${safe(
+                        shipment.quantity
+                      )}
+                    </td>
+
+                    <td>
+                      ${
+                        safe(
+                          shipment.remarks
+                        ) || "—"
+                      }
+                    </td>
+
+                    <td>
+                      ${formatDate(
+                        shipment.stock_checked_date
+                      )}
+                    </td>
+
+                    <td>
+                      ${statusHtml}
+                    </td>
+
+                    <td class="actions">
+
+                      ${
+                        actionButton(
+                          "in-godown",
+                          shipment,
+                          "IN GODOWN"
+                        )
+                      }
+
+                      ${
+                        actionButton(
+                          "not-found",
+                          shipment,
+                          "NOT FOUND",
+                          "danger"
+                        )
+                      }
+
+                    </td>
+
+                  </tr>
+
+                `;
+
+              }
+            )
+            .join("")}
+
+        </tbody>
+
+      </table>
+
+    </div>
+
+  `;
+}
+
+
+/* =========================================================
+   RENDER EVERYTHING
+   ========================================================= */
+
+function render() {
+
+  const pending =
+    shipments.filter(
+      function (shipment) {
+        return !shipment.delivery_date;
+      }
+    );
+
+
+  const accountsPending =
+    shipments.filter(
+      function (shipment) {
+        return (
+          shipment.delivery_date &&
+          !shipment.accounts_date
+        );
+      }
+    );
+
+
+  const completed =
+    shipments.filter(
+      function (shipment) {
+        return !!shipment.accounts_date;
+      }
+    );
+
+
+  const receivedToday =
+    shipments.filter(
+      function (shipment) {
+        return (
+          shipment.received_date ===
+          today()
+        );
+      }
+    );
+
+
+  const completedToday =
+    completed.filter(
+      function (shipment) {
+        return (
+          shipment.accounts_date ===
+          today()
+        );
+      }
+    );
+
+
+  const statReceived =
+    $("#stat-received");
+
+  const statDelivery =
+    $("#stat-delivery");
+
+  const statAccounts =
+    $("#stat-accounts");
+
+  const statCompleted =
+    $("#stat-completed");
+
+
+  if (statReceived) {
+    statReceived.textContent =
+      receivedToday.length;
+  }
+
+
+  if (statDelivery) {
+    statDelivery.textContent =
+      pending.length;
+  }
+
+
+  if (statAccounts) {
+    statAccounts.textContent =
+      accountsPending.length;
+  }
+
+
+  if (statCompleted) {
+    statCompleted.textContent =
+      completedToday.length;
+  }
+
+
+  const deliveryCount =
+    $("#delivery-count");
+
+  if (deliveryCount) {
+
+    deliveryCount.textContent =
+      pending.length || "";
+
+  }
+
+
+  const accountsCount =
+    $("#accounts-count");
+
+  if (accountsCount) {
+
+    accountsCount.textContent =
+      accountsPending.length || "";
+
+  }
+
+
+  renderTable(
+    shipments.slice(0, 6),
+    "#recent-table"
+  );
+
+
+  renderTable(
+    pending,
+    "#delivery-table",
+    "workflow"
+  );
+
+
+  renderTable(
+    accountsPending,
+    "#accounts-table",
+    "workflow"
+  );
+
+
+  renderTable(
+    shipments,
+    "#all-table",
+    "all"
+  );
+
+
+  renderStockTable(
+    pending
+  );
+
+
+  populateDatalists();
+}
+
+
+/* =========================================================
+   PARTY / BRANCH DATALISTS
+   ========================================================= */
+
+function populateDatalists() {
+
+  const partyNames =
+    [
+      ...new Set(
+        shipments
+          .map(
+            function (shipment) {
+              return shipment.party_name;
+            }
+          )
+          .filter(Boolean)
+      )
+    ]
+      .sort(
+        function (a, b) {
+          return a.localeCompare(b);
+        }
+      );
+
+
+  const branchNames =
+    [
+      ...new Set(
+        shipments
+          .map(
+            function (shipment) {
+              return shipment.branch_name;
+            }
+          )
+          .filter(Boolean)
+      )
+    ]
+      .sort(
+        function (a, b) {
+          return a.localeCompare(b);
+        }
+      );
+
+
+  const partyList =
+    $("#party-list");
+
+
+  if (partyList) {
+
+    partyList.innerHTML =
+      partyNames
+        .map(
+          function (name) {
+            return `
+              <option
+                value="${safe(name)}"
+              ></option>
+            `;
+          }
+        )
+        .join("");
+
+  }
+
+
+  const branchList =
+    $("#branch-list");
+
+
+  if (branchList) {
+
+    branchList.innerHTML =
+      branchNames
+        .map(
+          function (name) {
+            return `
+              <option
+                value="${safe(name)}"
+              ></option>
+            `;
+          }
+        )
+        .join("");
+
+  }
+}
+
+
+/* =========================================================
+   PAGE NAVIGATION
+   ========================================================= */
+
+function showPage(
+  pageName
+) {
+
+  document
+    .querySelectorAll(".page")
+    .forEach(
+      function (page) {
+
+        page.classList.toggle(
+          "active",
+          page.id === pageName
+        );
+
+      }
+    );
+
+
+  document
+    .querySelectorAll(".nav-link")
+    .forEach(
+      function (button) {
+
+        button.classList.toggle(
+          "active",
+          button.dataset.page ===
+            pageName
+        );
+
+      }
+    );
+
+
+  const titles = {
+
+    dashboard: [
+      "Good morning",
+      "CHENNAI BRANCH"
+    ],
+
+    receive: [
+      editingShipmentId
+        ? "Edit shipment"
+        : "Receive goods",
+      "NEW GOODS ENTRY"
+    ],
+
+    delivery: [
+      "Pending delivery",
+      "CHENNAI BRANCH"
+    ],
+
+    accounts: [
+      "Accounts pending",
+      "CHENNAI BRANCH"
+    ],
+
+    stock: [
+      "Godown stock check",
+      "DAILY PHYSICAL VERIFICATION"
+    ],
+
+    all: [
+      "All shipments",
+      "CHENNAI BRANCH"
+    ]
+
+  };
+
+
+  const title =
+    titles[pageName] ||
+    titles.dashboard;
+
+
+  const pageTitle =
+    $("#page-title");
+
+  const pageKicker =
+    $("#page-kicker");
+
+
+  if (pageTitle) {
+    pageTitle.textContent =
+      title[0];
+  }
+
+
+  if (pageKicker) {
+    pageKicker.textContent =
+      title[1];
+  }
+
+
+  const receiveButton =
+    $("#receive-button");
+
+
+  if (receiveButton) {
+
+    receiveButton.style.display =
+      pageName === "receive"
+        ? "none"
+        : "";
+
+  }
+}
+
+
+/* =========================================================
+   RESET RECEIVE FORM
+   ========================================================= */
+
+function resetReceiveForm() {
+
+  editingShipmentId = null;
+
+
+  const form =
+    $("#shipment-form");
+
+
+  if (!form) {
+    return;
+  }
+
+
+  form.reset();
+
+
+  if (
+    form.elements.received_date
+  ) {
+
+    form.elements.received_date.value =
+      today();
+
+  }
+
+
+  const submitButton =
+    form.querySelector(
+      'button[type="submit"]'
+    );
+
+
+  if (submitButton) {
+
+    submitButton.textContent =
+      "SAVE GOODS RECEIPT";
+
+  }
+
+
+  const message =
+    $("#form-message");
+
+
+  if (message) {
+    message.textContent = "";
+  }
+}
+
+
+/* =========================================================
+   EDIT SHIPMENT
+   ========================================================= */
+
+function editShipment(
+  shipment
+) {
+
+  editingShipmentId =
+    shipment.id;
+
+
+  const form =
+    $("#shipment-form");
+
+
+  if (!form) {
+    return;
+  }
+
+
+  form.elements.received_date.value =
+    shipment.received_date || "";
+
+
+  form.elements.lr_number.value =
+    shipment.lr_number || "";
+
+
+  form.elements.party_name.value =
+    shipment.party_name || "";
+
+
+  form.elements.branch_name.value =
+    shipment.branch_name || "";
+
+
+  form.elements.quantity.value =
+    shipment.quantity ?? "";
+
+
+  form.elements.amount.value =
+    shipment.amount ?? "";
+
+
+  form.elements.payment_type.value =
+    shipment.payment_type ||
+    "TOPAY";
+
+
+  form.elements.remarks.value =
+    shipment.remarks || "";
+
+
+  const submitButton =
+    form.querySelector(
+      'button[type="submit"]'
+    );
+
+
+  if (submitButton) {
+
+    submitButton.textContent =
+      "SAVE CHANGES";
+
+  }
+
+
+  showPage("receive");
+}
+
+
+/* =========================================================
+   CLOUD ACTION
+   ========================================================= */
+
+async function cloudAction(
+  action
+) {
+
+  try {
+
+    await action();
+
+    await loadShipments();
+
+  } catch (error) {
+
+    console.error(
+      "CLOUD ACTION ERROR:",
+      error
+    );
+
+
+    alert(
+      error.message ||
+      "SOMETHING WENT WRONG."
+    );
+
+  }
+}
+
+
+/* =========================================================
+   RECEIVE GOODS
+   ========================================================= */
+
+const shipmentForm =
+  $("#shipment-form");
+
 
 if (shipmentForm) {
 
@@ -1058,128 +1702,435 @@ if (shipmentForm) {
       event.preventDefault();
 
 
-      const submitButton =
+      const formMessage =
+        $("#form-message");
+
+
+      const saveButton =
         shipmentForm.querySelector(
           'button[type="submit"]'
         );
 
 
+      const receivedDate =
+        shipmentForm.elements
+          .received_date
+          .value;
+
+
+      const lrNumber =
+        normalizeUppercase(
+          shipmentForm.elements
+            .lr_number
+            .value
+        );
+
+
+      const partyName =
+        normalizeUppercase(
+          shipmentForm.elements
+            .party_name
+            .value
+        );
+
+
+      const branchName =
+        normalizeUppercase(
+          shipmentForm.elements
+            .branch_name
+            .value
+        );
+
+
+      const quantity =
+        shipmentForm.elements
+          .quantity
+          .value;
+
+
+      const amount =
+        shipmentForm.elements
+          .amount
+          .value;
+
+
+      const paymentType =
+        shipmentForm.elements
+          .payment_type
+          .value;
+
+
+      const remarks =
+        normalizeUppercase(
+          shipmentForm.elements
+            .remarks
+            .value
+        );
+
+
+      /* ---------------------------------------------------
+         VALIDATION
+         --------------------------------------------------- */
+
+      if (!receivedDate) {
+
+        formMessage.textContent =
+          "PLEASE SELECT RECEIVED DATE.";
+
+        return;
+      }
+
+
+      if (!lrNumber) {
+
+        formMessage.textContent =
+          "PLEASE ENTER LR NUMBER.";
+
+        return;
+      }
+
+
+      if (!partyName) {
+
+        formMessage.textContent =
+          "PLEASE ENTER PARTY NAME.";
+
+        return;
+      }
+
+
+      if (!branchName) {
+
+        formMessage.textContent =
+          "PLEASE ENTER FROM BRANCH.";
+
+        return;
+      }
+
+
+      if (
+        !quantity ||
+        Number(quantity) <= 0
+      ) {
+
+        formMessage.textContent =
+          "PLEASE ENTER A VALID QUANTITY.";
+
+        return;
+      }
+
+
+      if (
+        amount === "" ||
+        Number(amount) < 0
+      ) {
+
+        formMessage.textContent =
+          "PLEASE ENTER A VALID AMOUNT.";
+
+        return;
+      }
+
+
+      if (
+        ![
+          "TOPAY",
+          "TBB",
+          "PAID"
+        ].includes(paymentType)
+      ) {
+
+        formMessage.textContent =
+          "PLEASE SELECT A VALID PAYMENT TYPE.";
+
+        return;
+      }
+
+
+      /* ---------------------------------------------------
+         CHECK LOGIN
+         --------------------------------------------------- */
+
+      accessToken =
+        sessionStorage.getItem(
+          SESSION_KEY
+        );
+
+
       if (!accessToken) {
 
-        if (formMessage) {
-
-          formMessage.textContent =
-            "YOUR LOGIN SESSION HAS EXPIRED. PLEASE SIGN IN AGAIN.";
-
-        }
+        formMessage.textContent =
+          "YOUR LOGIN SESSION HAS EXPIRED. PLEASE SIGN IN AGAIN.";
 
         showLogin();
 
         return;
-
       }
 
 
-      if (submitButton) {
+      /* ---------------------------------------------------
+         BUTTON
+         --------------------------------------------------- */
 
-        submitButton.disabled =
-          true;
+      if (saveButton) {
 
-        submitButton.textContent =
+        saveButton.disabled = true;
+
+        saveButton.textContent =
           "SAVING...";
 
       }
 
 
-      if (formMessage) {
-
-        formMessage.textContent =
-          "SAVING TO CLOUD...";
-
-      }
+      formMessage.textContent =
+        "SAVING GOODS RECEIPT...";
 
 
       try {
 
-        const shipment =
-          await saveShipment();
+        /* -------------------------------------------------
+           FIND OR CREATE PARTY
+           ------------------------------------------------- */
+
+        const partyId =
+          await getOrCreateParty(
+            partyName
+          );
 
 
-        if (formMessage) {
+        /* -------------------------------------------------
+           FIND OR CREATE BRANCH
+           ------------------------------------------------- */
+
+        const branchId =
+          await getOrCreateBranch(
+            branchName
+          );
+
+
+        /* -------------------------------------------------
+           SHIPMENT PAYLOAD
+           ------------------------------------------------- */
+
+        const payload = {
+
+          received_date:
+            receivedDate,
+
+          lr_number:
+            lrNumber,
+
+          party_id:
+            partyId,
+
+          quantity:
+            Number(quantity),
+
+          amount:
+            Number(amount),
+
+          payment_type:
+            paymentType,
+
+          from_branch_id:
+            branchId,
+
+          remarks:
+            remarks || null
+
+        };
+
+
+        /* -------------------------------------------------
+           EDIT EXISTING
+           ------------------------------------------------- */
+
+        if (editingShipmentId) {
+
+          await api(
+            `shipments?id=eq.${encodeURIComponent(
+              editingShipmentId
+            )}`,
+            {
+              method: "PATCH",
+
+              headers: {
+                "Content-Type":
+                  "application/json",
+
+                Prefer:
+                  "return=minimal"
+              },
+
+              body:
+                JSON.stringify(
+                  payload
+                )
+            }
+          );
+
+
+          editingShipmentId =
+            null;
+
 
           formMessage.textContent =
-            "RECEIVE GOODS SAVED SUCCESSFULLY — SERIAL NO. " +
-            shipment.serial_no;
+            "SHIPMENT UPDATED SUCCESSFULLY.";
 
         }
 
+
+        /* -------------------------------------------------
+           CREATE NEW
+           ------------------------------------------------- */
+
+        else {
+
+          const created =
+            await api(
+              "shipments",
+              {
+                method: "POST",
+
+                headers: {
+                  "Content-Type":
+                    "application/json",
+
+                  Prefer:
+                    "return=representation"
+                },
+
+                body:
+                  JSON.stringify([
+                    payload
+                  ])
+              }
+            );
+
+
+          if (
+            !created ||
+            !created.length
+          ) {
+
+            throw new Error(
+              "SHIPMENT WAS NOT SAVED."
+            );
+
+          }
+
+
+          const newShipment =
+            created[0];
+
+
+          /* -----------------------------------------------
+             RECEIVED EVENT
+             ----------------------------------------------- */
+
+          try {
+
+            await api(
+              "shipment_events",
+              {
+                method: "POST",
+
+                headers: {
+                  "Content-Type":
+                    "application/json",
+
+                  Prefer:
+                    "return=minimal"
+                },
+
+                body:
+                  JSON.stringify([
+                    {
+                      shipment_id:
+                        newShipment.id,
+
+                      event_type:
+                        "RECEIVED",
+
+                      event_date:
+                        receivedDate,
+
+                      notes:
+                        remarks ||
+                        null
+                    }
+                  ])
+              }
+            );
+
+          } catch (eventError) {
+
+            console.error(
+              "RECEIVED EVENT ERROR:",
+              eventError
+            );
+
+            /*
+             * The shipment itself has already been
+             * successfully saved.
+             */
+          }
+
+
+          formMessage.textContent =
+            "RECEIVE GOODS SAVED SUCCESSFULLY.";
+
+        }
+
+
+        /* -------------------------------------------------
+           RESET
+           ------------------------------------------------- */
 
         shipmentForm.reset();
 
 
-        /*
-           Clear hidden Party / Branch IDs
-           if they exist.
-        */
-
-        const partyIdInput =
-          document.getElementById(
-            "party-id"
-          );
+        shipmentForm.elements
+          .received_date.value =
+          today();
 
 
-        if (partyIdInput) {
+        if (saveButton) {
 
-          partyIdInput.value =
-            "";
+          saveButton.textContent =
+            "SAVE GOODS RECEIPT";
 
         }
 
 
-        const branchIdInput =
-          document.getElementById(
-            "branch-id"
-          );
-
-
-        if (branchIdInput) {
-
-          branchIdInput.value =
-            "";
-
-        }
-
-
-        console.log(
-          "SHIPMENT SAVED SUCCESSFULLY:",
-          shipment
-        );
+        await loadShipments();
 
 
       } catch (error) {
 
         console.error(
-          "RECEIVE GOODS ERROR:",
+          "RECEIVE GOODS SAVE ERROR:",
           error
         );
 
 
-        if (formMessage) {
-
-          formMessage.textContent =
-            error.message;
-
-        }
+        formMessage.textContent =
+          error.message ||
+          "ERROR SAVING GOODS RECEIPT.";
 
       } finally {
 
-        if (submitButton) {
+        if (saveButton) {
 
-          submitButton.disabled =
+          saveButton.disabled =
             false;
 
-          submitButton.textContent =
-            "Save goods receipt";
+          if (!editingShipmentId) {
+
+            saveButton.textContent =
+              "SAVE GOODS RECEIPT";
+
+          }
 
         }
 
@@ -1192,715 +2143,741 @@ if (shipmentForm) {
 
 
 /* =========================================================
-   SMART PARTY / BRANCH SEARCH
+   DELIVERY / ACCOUNTS / STOCK / EDIT / DELETE
    ========================================================= */
 
-function setupSmartSearch({
+document.addEventListener(
+  "click",
+  function (event) {
 
-  inputId,
-  hiddenId,
-  suggestionsId,
-  table,
-  label
-
-}) {
-
-  const input =
-    document.getElementById(
-      inputId
-    );
-
-
-  const hidden =
-    document.getElementById(
-      hiddenId
-    );
-
-
-  const suggestions =
-    document.getElementById(
-      suggestionsId
-    );
-
-
-  if (
-    !input ||
-    !hidden ||
-    !suggestions
-  ) {
-
-    console.warn(
-      "SMART SEARCH ELEMENTS MISSING:",
-      label
-    );
-
-    return;
-
-  }
-
-
-  let searchTimer =
-    null;
-
-
-  function hideSuggestions() {
-
-    suggestions.hidden =
-      true;
-
-    suggestions.innerHTML =
-      "";
-
-  }
-
-
-  function showMessage(
-    message
-  ) {
-
-    suggestions.innerHTML =
-      "";
-
-
-    const item =
-      document.createElement(
-        "div"
+    const button =
+      event.target.closest(
+        "[data-action]"
       );
 
 
-    item.className =
-      "smart-suggestion";
-
-
-    item.textContent =
-      message;
-
-
-    suggestions.appendChild(
-      item
-    );
-
-
-    suggestions.hidden =
-      false;
-
-  }
-
-
-  function showResults(
-    rows,
-    searchText
-  ) {
-
-    suggestions.innerHTML =
-      "";
-
-
-    rows.forEach(
-      function (row) {
-
-        const item =
-          document.createElement(
-            "div"
-          );
-
-
-        item.className =
-          "smart-suggestion";
-
-
-        const name =
-          document.createElement(
-            "div"
-          );
-
-
-        name.className =
-          "smart-suggestion-name";
-
-
-        name.textContent =
-          row.name;
-
-
-        item.appendChild(
-          name
-        );
-
-
-        if (row.phone) {
-
-          const meta =
-            document.createElement(
-              "div"
-            );
-
-
-          meta.className =
-            "smart-suggestion-meta";
-
-
-          meta.textContent =
-            row.phone;
-
-
-          item.appendChild(
-            meta
-          );
-
-        }
-
-
-        item.addEventListener(
-          "mousedown",
-          function (event) {
-
-            event.preventDefault();
-
-
-            input.value =
-              row.name;
-
-
-            hidden.value =
-              row.id;
-
-
-            hideSuggestions();
-
-          }
-        );
-
-
-        suggestions.appendChild(
-          item
-        );
-
-      }
-    );
-
-
-    /*
-       Add new record option.
-    */
-
-    if (searchText) {
-
-      const createItem =
-        document.createElement(
-          "div"
-        );
-
-
-      createItem.className =
-        "smart-create";
-
-
-      createItem.textContent =
-        '+ ADD "' +
-        searchText +
-        '" AS NEW ' +
-        label.toUpperCase();
-
-
-      createItem.addEventListener(
-        "mousedown",
-        function (event) {
-
-          event.preventDefault();
-
-
-          createNewRecord(
-
-            table,
-            label,
-            input,
-            hidden,
-            suggestions
-
-          );
-
-        }
-      );
-
-
-      suggestions.appendChild(
-        createItem
-      );
-
+    if (!button) {
+      return;
     }
 
 
-    suggestions.hidden =
-      false;
-
-  }
-
-
-  async function search() {
-
-    const searchText =
-      normalizeUppercase(
-        input.value
+    const shipment =
+      shipments.find(
+        function (item) {
+          return (
+            item.id ===
+            button.dataset.id
+          );
+        }
       );
 
 
-    /*
-       If user changes the name,
-       remove the old ID.
-    */
-
-    hidden.value =
-      "";
+    if (!shipment) {
+      return;
+    }
 
 
-    if (!searchText) {
+    const type =
+      button.dataset.action;
 
-      hideSuggestions();
+
+    /* -----------------------------------------------------
+       EDIT
+       ----------------------------------------------------- */
+
+    if (type === "edit") {
+
+      editShipment(
+        shipment
+      );
 
       return;
-
     }
 
 
-    clearTimeout(
-      searchTimer
-    );
+    /* -----------------------------------------------------
+       DELETE
+       ----------------------------------------------------- */
+
+    if (type === "delete") {
+
+      const confirmed =
+        confirm(
+          `DELETE LR ${shipment.lr_number}? THIS CANNOT BE UNDONE.`
+        );
 
 
-    searchTimer =
-      setTimeout(
+      if (!confirmed) {
+        return;
+      }
+
+
+      cloudAction(
         async function () {
 
-          try {
+          await api(
+            `shipments?id=eq.${encodeURIComponent(
+              shipment.id
+            )}`,
+            {
+              method: "DELETE",
 
-            const token =
-              sessionStorage.getItem(
-                "chennai_access_token"
-              );
-
-
-            if (!token) {
-
-              showMessage(
-                "PLEASE SIGN IN AGAIN."
-              );
-
-              return;
-
+              headers: {
+                Prefer:
+                  "return=minimal"
+              }
             }
+          );
+
+        }
+      );
 
 
-            const response =
-              await fetch(
+      return;
+    }
 
-                SUPABASE_URL +
-                "/rest/v1/" +
-                table +
-                "?select=id,name,phone" +
-                "&name=ilike.*" +
-                encodeURIComponent(
-                  searchText
-                ) +
-                "*" +
-                "&is_active=eq.true" +
-                "&order=name.asc" +
-                "&limit=10",
 
-                {
+    /* -----------------------------------------------------
+       MARK UNDELIVERED
+       ----------------------------------------------------- */
 
-                  method: "GET",
+    if (
+      type ===
+      "undelivered"
+    ) {
 
-                  headers: {
+      const confirmed =
+        confirm(
+          `MARK LR ${shipment.lr_number} AS UNDELIVERED? DELIVERY AND A/C DATES WILL BE REMOVED.`
+        );
 
-                    "apikey":
-                      SUPABASE_KEY,
 
-                    "Authorization":
-                      "Bearer " +
-                      token
+      if (!confirmed) {
+        return;
+      }
 
+
+      cloudAction(
+        async function () {
+
+          await api(
+            `shipments?id=eq.${encodeURIComponent(
+              shipment.id
+            )}`,
+            {
+              method: "PATCH",
+
+              headers: {
+                "Content-Type":
+                  "application/json",
+
+                Prefer:
+                  "return=minimal"
+              },
+
+              body:
+                JSON.stringify({
+                  delivery_date:
+                    null,
+
+                  accounts_date:
+                    null
+                })
+            }
+          );
+
+
+          /*
+           * Your shipment_events table only accepts:
+           * RECEIVED
+           * DELIVERED
+           * ACCOUNTS_COMPLETED
+           * NOTE
+           *
+           * Therefore we use NOTE for reversal.
+           */
+
+          await api(
+            "shipment_events",
+            {
+              method: "POST",
+
+              headers: {
+                "Content-Type":
+                  "application/json",
+
+                Prefer:
+                  "return=minimal"
+              },
+
+              body:
+                JSON.stringify([
+                  {
+                    shipment_id:
+                      shipment.id,
+
+                    event_type:
+                      "NOTE",
+
+                    event_date:
+                      today(),
+
+                    notes:
+                      "DELIVERY REVERSED"
                   }
-
-                }
-
-              );
-
-
-            const data =
-              await response.json();
-
-
-            if (!response.ok) {
-
-              console.error(
-                "SMART SEARCH ERROR:",
-                data
-              );
-
-
-              showMessage(
-                "UNABLE TO SEARCH " +
-                label.toUpperCase() +
-                "."
-              );
-
-
-              return;
-
+                ])
             }
+          );
+
+        }
+      );
 
 
-            showResults(
-              data || [],
-              searchText
+      return;
+    }
+
+
+    /* -----------------------------------------------------
+       STOCK CHECK
+       ----------------------------------------------------- */
+
+    if (
+      type ===
+      "in-godown" ||
+      type ===
+      "not-found"
+    ) {
+
+      const checkStatus =
+        type ===
+        "in-godown"
+          ? "IN GODOWN"
+          : "NOT FOUND";
+
+
+      cloudAction(
+        async function () {
+
+          await api(
+            "stock_checks?on_conflict=shipment_id,checked_date",
+            {
+              method: "POST",
+
+              headers: {
+                "Content-Type":
+                  "application/json",
+
+                Prefer:
+                  "resolution=merge-duplicates,return=minimal"
+              },
+
+              body:
+                JSON.stringify([
+                  {
+                    shipment_id:
+                      shipment.id,
+
+                    checked_date:
+                      today(),
+
+                    check_status:
+                      checkStatus
+                  }
+                ])
+            }
+          );
+
+        }
+      );
+
+
+      return;
+    }
+
+
+    /* -----------------------------------------------------
+       DELIVERY / ACCOUNTS DATE DIALOG
+       ----------------------------------------------------- */
+
+    if (
+      type !== "deliver" &&
+      type !== "accounts"
+    ) {
+
+      return;
+    }
+
+
+    currentAction = {
+      type: type,
+      shipment: shipment
+    };
+
+
+    const dialog =
+      $("#date-dialog");
+
+
+    if (!dialog) {
+      return;
+    }
+
+
+    const dialogTitle =
+      $("#dialog-title");
+
+
+    const dialogDetail =
+      $("#dialog-detail");
+
+
+    const dateLabel =
+      $("#date-label");
+
+
+    const dateInput =
+      $("#action-date");
+
+
+    if (dialogTitle) {
+
+      dialogTitle.textContent =
+        type === "deliver"
+          ? "ENTER DELIVERY DATE"
+          : "ENTER A/C DATE";
+
+    }
+
+
+    if (dialogDetail) {
+
+      dialogDetail.textContent =
+        `${shipment.lr_number} · ${shipment.party_name}`;
+
+    }
+
+
+    if (dateLabel) {
+
+      dateLabel.textContent =
+        type === "deliver"
+          ? "DELIVERY DATE"
+          : "A/C DATE";
+
+    }
+
+
+    if (dateInput) {
+
+      dateInput.min =
+        type === "deliver"
+          ? shipment.received_date
+          : shipment.delivery_date;
+
+
+      dateInput.value =
+        type === "deliver"
+          ? (
+              shipment.delivery_date ||
+              today()
+            )
+          : (
+              shipment.accounts_date ||
+              today()
             );
 
-
-          } catch (error) {
-
-            console.error(
-              "SMART SEARCH ERROR:",
-              error
-            );
+    }
 
 
-            showMessage(
-              "SEARCH ERROR."
+    if (
+      typeof dialog.showModal ===
+      "function"
+    ) {
+
+      dialog.showModal();
+
+    } else {
+
+      dialog.setAttribute(
+        "open",
+        ""
+      );
+
+    }
+
+  }
+);
+
+
+/* =========================================================
+   DATE DIALOG
+   ========================================================= */
+
+const dateForm =
+  $("#date-form");
+
+
+if (dateForm) {
+
+  dateForm.addEventListener(
+    "submit",
+    async function (event) {
+
+      /*
+       * The HTML uses method="dialog".
+       * We manually control the action.
+       */
+
+      if (
+        event.submitter &&
+        event.submitter.value ===
+          "cancel"
+      ) {
+
+        return;
+      }
+
+
+      event.preventDefault();
+
+
+      if (!currentAction) {
+        return;
+      }
+
+
+      const selectedDate =
+        $("#action-date").value;
+
+
+      if (!selectedDate) {
+
+        alert(
+          "PLEASE SELECT A DATE."
+        );
+
+        return;
+      }
+
+
+      const shipment =
+        currentAction.shipment;
+
+
+      const isDelivery =
+        currentAction.type ===
+        "deliver";
+
+
+      const field =
+        isDelivery
+          ? "delivery_date"
+          : "accounts_date";
+
+
+      try {
+
+        await api(
+          `shipments?id=eq.${encodeURIComponent(
+            shipment.id
+          )}`,
+          {
+            method: "PATCH",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+
+              Prefer:
+                "return=minimal"
+            },
+
+            body:
+              JSON.stringify({
+                [field]:
+                  selectedDate,
+
+                /*
+                 * If delivery is being entered,
+                 * accounts date must remain null
+                 * until accounts is completed.
+                 */
+              })
+          }
+        );
+
+
+        /* -------------------------------------------------
+           CREATE EVENT
+           ------------------------------------------------- */
+
+        await api(
+          "shipment_events",
+          {
+            method: "POST",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+
+              Prefer:
+                "return=minimal"
+            },
+
+            body:
+              JSON.stringify([
+                {
+                  shipment_id:
+                    shipment.id,
+
+                  event_type:
+                    isDelivery
+                      ? "DELIVERED"
+                      : "ACCOUNTS_COMPLETED",
+
+                  event_date:
+                    selectedDate,
+
+                  notes:
+                    null
+                }
+              ])
+          }
+        );
+
+
+        const dialog =
+          $("#date-dialog");
+
+
+        if (dialog) {
+
+          if (
+            typeof dialog.close ===
+            "function"
+          ) {
+
+            dialog.close();
+
+          } else {
+
+            dialog.removeAttribute(
+              "open"
             );
 
           }
 
-        },
-        250
-      );
-
-  }
-
-
-  input.addEventListener(
-    "input",
-    search
-  );
-
-
-  input.addEventListener(
-    "focus",
-    function () {
-
-      if (
-        input.value.trim()
-      ) {
-
-        search();
-
-      }
-
-    }
-  );
-
-
-  input.addEventListener(
-    "blur",
-    function () {
-
-      setTimeout(
-        hideSuggestions,
-        200
-      );
-
-    }
-  );
-
-
-  input.addEventListener(
-    "change",
-    function () {
-
-      input.value =
-        normalizeUppercase(
-          input.value
-        );
-
-    }
-  );
-
-}
-
-
-/* =========================================================
-   CREATE NEW PARTY / BRANCH
-   ========================================================= */
-
-async function createNewRecord(
-
-  table,
-  label,
-  input,
-  hidden,
-  suggestions
-
-) {
-
-  const name =
-    normalizeUppercase(
-      input.value
-    );
-
-
-  if (!name) {
-
-    alert(
-      "PLEASE ENTER A " +
-      label.toUpperCase() +
-      " NAME."
-    );
-
-    return;
-
-  }
-
-
-  const token =
-    sessionStorage.getItem(
-      "chennai_access_token"
-    );
-
-
-  if (!token) {
-
-    alert(
-      "YOUR LOGIN SESSION HAS EXPIRED. PLEASE SIGN IN AGAIN."
-    );
-
-    return;
-
-  }
-
-
-  try {
-
-    suggestions.hidden =
-      true;
-
-
-    const response =
-      await fetch(
-
-        SUPABASE_URL +
-        "/rest/v1/" +
-        table,
-
-        {
-
-          method: "POST",
-
-          headers: {
-
-            "apikey":
-              SUPABASE_KEY,
-
-            "Authorization":
-              "Bearer " +
-              token,
-
-            "Content-Type":
-              "application/json",
-
-            "Prefer":
-              "return=representation"
-
-          },
-
-          body:
-            JSON.stringify({
-
-              name:
-                name,
-
-              is_active:
-                true
-
-            })
-
         }
 
-      );
+
+        currentAction =
+          null;
 
 
-    const data =
-      await response.json();
+        await loadShipments();
 
 
-    if (!response.ok) {
+      } catch (error) {
 
-      console.error(
-        "CREATE ERROR:",
-        data
-      );
-
-
-      if (
-        response.status === 409 ||
-        (
-          data &&
-          data.code === "23505"
-        )
-      ) {
-
-        alert(
-          "THIS " +
-          label.toUpperCase() +
-          " ALREADY EXISTS. SEARCH AND SELECT IT."
+        console.error(
+          "DATE UPDATE ERROR:",
+          error
         );
 
-      } else {
 
         alert(
-
-          data.message ||
-          data.error_description ||
-          data.details ||
-          "UNABLE TO CREATE " +
-          label.toUpperCase() +
-          "."
-
+          error.message ||
+          "COULD NOT SAVE DATE."
         );
 
       }
 
-
-      return;
-
     }
-
-
-    if (
-      !data ||
-      !data.length
-    ) {
-
-      alert(
-        label.toUpperCase() +
-        " WAS NOT CREATED."
-      );
-
-      return;
-
-    }
-
-
-    const created =
-      data[0];
-
-
-    input.value =
-      created.name;
-
-
-    hidden.value =
-      created.id;
-
-
-    suggestions.hidden =
-      true;
-
-
-    console.log(
-      "NEW " +
-      label.toUpperCase() +
-      " CREATED:",
-      created
-    );
-
-
-    /*
-       Refresh datalist in background.
-    */
-
-    if (
-      table === "parties"
-    ) {
-
-      loadParties();
-
-    }
-
-
-    if (
-      table === "branches"
-    ) {
-
-      loadBranches();
-
-    }
-
-
-  } catch (error) {
-
-    console.error(
-      "CREATE RECORD ERROR:",
-      error
-    );
-
-
-    alert(
-      "ERROR CREATING " +
-      label.toUpperCase() +
-      "."
-    );
-
-  }
+  );
 
 }
 
 
 /* =========================================================
-   START SMART SEARCH
+   SEARCH
    ========================================================= */
 
-setupSmartSearch({
+document
+  .querySelectorAll(
+    "[data-search]"
+  )
+  .forEach(
+    function (input) {
 
-  inputId:
-    "party-name",
+      input.addEventListener(
+        "input",
+        function () {
 
-  hiddenId:
-    "party-id",
-
-  suggestionsId:
-    "party-suggestions",
-
-  table:
-    "parties",
-
-  label:
-    "party"
-
-});
+          const searchText =
+            normalizeUppercase(
+              input.value
+            );
 
 
-setupSmartSearch({
+          const kind =
+            input.dataset.search;
 
-  inputId:
-    "branch-name",
 
-  hiddenId:
-    "branch-id",
+          let data =
+            shipments;
 
-  suggestionsId:
-    "branch-suggestions",
 
-  table:
-    "branches",
+          if (
+            kind ===
+            "delivery"
+          ) {
 
-  label:
-    "branch"
+            data =
+              shipments.filter(
+                function (shipment) {
 
-});
+                  return !shipment.delivery_date;
+
+                }
+              );
+
+          }
+
+
+          if (
+            kind ===
+            "accounts"
+          ) {
+
+            data =
+              shipments.filter(
+                function (shipment) {
+
+                  return (
+                    shipment.delivery_date &&
+                    !shipment.accounts_date
+                  );
+
+                }
+              );
+
+          }
+
+
+          if (
+            kind ===
+            "stock"
+          ) {
+
+            data =
+              shipments.filter(
+                function (shipment) {
+
+                  return !shipment.delivery_date;
+
+                }
+              );
+
+          }
+
+
+          if (searchText) {
+
+            data =
+              data.filter(
+                function (shipment) {
+
+                  const combined =
+                    [
+                      shipment.lr_number,
+                      shipment.party_name,
+                      shipment.branch_name,
+                      shipment.remarks
+                    ]
+                      .filter(Boolean)
+                      .join(" ");
+
+
+                  return normalizeUppercase(
+                    combined
+                  ).includes(
+                    searchText
+                  );
+
+                }
+              );
+
+          }
+
+
+          if (
+            kind ===
+            "delivery"
+          ) {
+
+            renderTable(
+              data,
+              "#delivery-table",
+              "workflow"
+            );
+
+            return;
+
+          }
+
+
+          if (
+            kind ===
+            "accounts"
+          ) {
+
+            renderTable(
+              data,
+              "#accounts-table",
+              "workflow"
+            );
+
+            return;
+
+          }
+
+
+          if (
+            kind ===
+            "all"
+          ) {
+
+            renderTable(
+              data,
+              "#all-table",
+              "all"
+            );
+
+            return;
+
+          }
+
+
+          if (
+            kind ===
+            "stock"
+          ) {
+
+            renderStockTable(
+              data
+            );
+
+          }
+
+        }
+      );
+
+    }
+  );
 
 
 /* =========================================================
-   SIDEBAR NAVIGATION
+   NAVIGATION
    ========================================================= */
 
 document
@@ -1914,57 +2891,18 @@ document
         "click",
         function () {
 
-          const pageName =
-            button.dataset.page;
+          if (
+            button.dataset.page ===
+            "receive"
+          ) {
 
-
-          document
-            .querySelectorAll(
-              ".page"
-            )
-            .forEach(
-              function (page) {
-
-                page.classList.remove(
-                  "active"
-                );
-
-              }
-            );
-
-
-          const selectedPage =
-            document.getElementById(
-              pageName
-            );
-
-
-          if (selectedPage) {
-
-            selectedPage.classList.add(
-              "active"
-            );
+            resetReceiveForm();
 
           }
 
 
-          document
-            .querySelectorAll(
-              ".nav-link"
-            )
-            .forEach(
-              function (item) {
-
-                item.classList.remove(
-                  "active"
-                );
-
-              }
-            );
-
-
-          button.classList.add(
-            "active"
+          showPage(
+            button.dataset.page
           );
 
         }
@@ -1975,13 +2913,37 @@ document
 
 
 /* =========================================================
-   RECEIVE GOODS BUTTON
+   DATA-GO BUTTONS
+   ========================================================= */
+
+document
+  .querySelectorAll(
+    "[data-go]"
+  )
+  .forEach(
+    function (button) {
+
+      button.addEventListener(
+        "click",
+        function () {
+
+          showPage(
+            button.dataset.go
+          );
+
+        }
+      );
+
+    }
+  );
+
+
+/* =========================================================
+   RECEIVE BUTTON
    ========================================================= */
 
 const receiveButton =
-  document.getElementById(
-    "receive-button"
-  );
+  $("#receive-button");
 
 
 if (receiveButton) {
@@ -1990,64 +2952,11 @@ if (receiveButton) {
     "click",
     function () {
 
-      document
-        .querySelectorAll(
-          ".page"
-        )
-        .forEach(
-          function (page) {
+      resetReceiveForm();
 
-            page.classList.remove(
-              "active"
-            );
-
-          }
-        );
-
-
-      const receivePage =
-        document.getElementById(
-          "receive"
-        );
-
-
-      if (receivePage) {
-
-        receivePage.classList.add(
-          "active"
-        );
-
-      }
-
-
-      document
-        .querySelectorAll(
-          ".nav-link"
-        )
-        .forEach(
-          function (item) {
-
-            item.classList.remove(
-              "active"
-            );
-
-          }
-        );
-
-
-      const receiveNav =
-        document.querySelector(
-          '[data-page="receive"]'
-        );
-
-
-      if (receiveNav) {
-
-        receiveNav.classList.add(
-          "active"
-        );
-
-      }
+      showPage(
+        "receive"
+      );
 
     }
   );
@@ -2056,20 +2965,129 @@ if (receiveButton) {
 
 
 /* =========================================================
-   START APPLICATION
+   UPPERCASE INPUTS
+   ========================================================= */
+
+function setupUppercaseInput(
+  selector
+) {
+
+  document
+    .querySelectorAll(
+      selector
+    )
+    .forEach(
+      function (input) {
+
+        input.addEventListener(
+          "input",
+          function () {
+
+            const start =
+              input.selectionStart;
+
+
+            const end =
+              input.selectionEnd;
+
+
+            input.value =
+              normalizeUppercase(
+                input.value
+              );
+
+
+            try {
+
+              input.setSelectionRange(
+                start,
+                end
+              );
+
+            } catch {
+
+              /* Ignore */
+
+            }
+
+        });
+
+      }
+    );
+}
+
+
+setupUppercaseInput(
+  "#lr-number"
+);
+
+
+setupUppercaseInput(
+  "#party-name"
+);
+
+
+setupUppercaseInput(
+  "#branch-name"
+);
+
+
+setupUppercaseInput(
+  "#remarks"
+);
+
+
+/* =========================================================
+   INITIALIZE RECEIVE FORM
+   ========================================================= */
+
+resetReceiveForm();
+
+
+/* =========================================================
+   RESTORE SESSION
    ========================================================= */
 
 if (accessToken) {
 
   showApp();
 
+
+  loadShipments()
+    .then(
+      function () {
+
+        showPage(
+          "dashboard"
+        );
+
+      }
+    )
+    .catch(
+      function (error) {
+
+        console.error(
+          "SESSION RESTORE ERROR:",
+          error
+        );
+
+
+        accessToken =
+          null;
+
+
+        sessionStorage.removeItem(
+          SESSION_KEY
+        );
+
+
+        showLogin();
+
+      }
+    );
+
 } else {
 
   showLogin();
 
 }
-
-
-/* =========================================================
-   END OF APP.JS
-   ========================================================= */
