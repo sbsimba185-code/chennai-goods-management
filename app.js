@@ -2238,7 +2238,358 @@ async function markDelivered(
   }
 
 }
+/* =========================================================
+   EDIT SHIPMENT
+   ========================================================= */
 
+async function editShipment(shipment) {
+
+  const newLR =
+    prompt("EDIT LR NUMBER:", shipment.lr_number || "");
+
+  if (newLR === null) {
+    return;
+  }
+
+  const lrNumber =
+    normalizeUppercase(newLR);
+
+  if (!lrNumber) {
+    alert("LR NUMBER CANNOT BE EMPTY.");
+    return;
+  }
+
+  const newQuantity =
+    prompt(
+      "EDIT QUANTITY:",
+      shipment.quantity ?? ""
+    );
+
+  if (newQuantity === null) {
+    return;
+  }
+
+  const quantity =
+    Number(newQuantity);
+
+  if (!Number.isInteger(quantity) || quantity <= 0) {
+    alert("PLEASE ENTER A VALID QUANTITY.");
+    return;
+  }
+
+  const newAmount =
+    prompt(
+      "EDIT AMOUNT:",
+      shipment.amount ?? ""
+    );
+
+  if (newAmount === null) {
+    return;
+  }
+
+  const amount =
+    Number(newAmount);
+
+  if (Number.isNaN(amount) || amount < 0) {
+    alert("PLEASE ENTER A VALID AMOUNT.");
+    return;
+  }
+
+  const newRemarks =
+    prompt(
+      "EDIT REMARKS:",
+      shipment.remarks || ""
+    );
+
+  if (newRemarks === null) {
+    return;
+  }
+
+  const token =
+    sessionStorage.getItem(
+      "chennai_access_token"
+    );
+
+  if (!token) {
+    alert(
+      "YOUR LOGIN SESSION HAS EXPIRED. PLEASE SIGN IN AGAIN."
+    );
+    showLogin();
+    return;
+  }
+
+  try {
+
+    const response =
+      await fetch(
+        SUPABASE_URL +
+        "/rest/v1/shipments?id=eq." +
+        encodeURIComponent(shipment.id),
+        {
+          method: "PATCH",
+
+          headers: {
+            "apikey": SUPABASE_KEY,
+
+            "Authorization":
+              "Bearer " + token,
+
+            "Content-Type":
+              "application/json",
+
+            "Prefer":
+              "return=representation"
+          },
+
+          body: JSON.stringify({
+
+            lr_number:
+              lrNumber,
+
+            quantity:
+              quantity,
+
+            amount:
+              amount,
+
+            remarks:
+              normalizeUppercase(
+                newRemarks
+              ) || null
+
+          })
+        }
+      );
+
+    const data =
+      await response.json();
+
+    if (!response.ok) {
+
+      console.error(
+        "EDIT ERROR:",
+        data
+      );
+
+      throw new Error(
+        data.message ||
+        data.details ||
+        "UNABLE TO EDIT SHIPMENT."
+      );
+    }
+
+    alert(
+      "SHIPMENT UPDATED SUCCESSFULLY."
+    );
+
+    await load();
+
+  } catch (error) {
+
+    console.error(
+      "EDIT SHIPMENT ERROR:",
+      error
+    );
+
+    alert(
+      error.message ||
+      "ERROR UPDATING SHIPMENT."
+    );
+  }
+}
+
+
+/* =========================================================
+   DELETE SHIPMENT
+   ========================================================= */
+
+async function deleteShipment(shipment) {
+
+  const confirmed =
+    confirm(
+      "DELETE SHIPMENT?\n\n" +
+      "LR: " +
+      (shipment.lr_number || "") +
+      "\n\nTHIS ACTION CANNOT BE UNDONE."
+    );
+
+  if (!confirmed) {
+    return;
+  }
+
+  const token =
+    sessionStorage.getItem(
+      "chennai_access_token"
+    );
+
+  if (!token) {
+    alert(
+      "YOUR LOGIN SESSION HAS EXPIRED. PLEASE SIGN IN AGAIN."
+    );
+    showLogin();
+    return;
+  }
+
+  try {
+
+    const response =
+      await fetch(
+        SUPABASE_URL +
+        "/rest/v1/shipments?id=eq." +
+        encodeURIComponent(shipment.id),
+        {
+          method: "DELETE",
+
+          headers: {
+            "apikey": SUPABASE_KEY,
+
+            "Authorization":
+              "Bearer " + token
+          }
+        }
+      );
+
+    if (!response.ok) {
+
+      const error =
+        await response.json();
+
+      console.error(
+        "DELETE ERROR:",
+        error
+      );
+
+      throw new Error(
+        error.message ||
+        error.details ||
+        "UNABLE TO DELETE SHIPMENT."
+      );
+    }
+
+    alert(
+      "SHIPMENT DELETED SUCCESSFULLY."
+    );
+
+    await load();
+
+  } catch (error) {
+
+    console.error(
+      "DELETE SHIPMENT ERROR:",
+      error
+    );
+
+    alert(
+      error.message ||
+      "ERROR DELETING SHIPMENT."
+    );
+  }
+}
+
+
+/* =========================================================
+   UNDELIVER SHIPMENT
+   ========================================================= */
+
+async function undeliverShipment(shipment) {
+
+  const confirmed =
+    confirm(
+      "UNDELIVER THIS SHIPMENT?\n\n" +
+      "LR: " +
+      (shipment.lr_number || "") +
+      "\n\n" +
+      "IT WILL MOVE BACK TO PENDING DELIVERY."
+    );
+
+  if (!confirmed) {
+    return;
+  }
+
+  const token =
+    sessionStorage.getItem(
+      "chennai_access_token"
+    );
+
+  if (!token) {
+    alert(
+      "YOUR LOGIN SESSION HAS EXPIRED. PLEASE SIGN IN AGAIN."
+    );
+    showLogin();
+    return;
+  }
+
+  try {
+
+    const response =
+      await fetch(
+        SUPABASE_URL +
+        "/rest/v1/shipments?id=eq." +
+        encodeURIComponent(shipment.id),
+        {
+          method: "PATCH",
+
+          headers: {
+            "apikey": SUPABASE_KEY,
+
+            "Authorization":
+              "Bearer " + token,
+
+            "Content-Type":
+              "application/json",
+
+            "Prefer":
+              "return=representation"
+          },
+
+          body: JSON.stringify({
+
+            delivery_date:
+              null,
+
+            accounts_date:
+              null
+
+          })
+        }
+      );
+
+    const data =
+      await response.json();
+
+    if (!response.ok) {
+
+      console.error(
+        "UNDELIVER ERROR:",
+        data
+      );
+
+      throw new Error(
+        data.message ||
+        data.details ||
+        "UNABLE TO UNDELIVER SHIPMENT."
+      );
+    }
+
+    alert(
+      "SHIPMENT MOVED BACK TO PENDING DELIVERY."
+    );
+
+    await load();
+
+  } catch (error) {
+
+    console.error(
+      "UNDELIVER ERROR:",
+      error
+    );
+
+    alert(
+      error.message ||
+      "ERROR UNDELIVERING SHIPMENT."
+    );
+  }
+}
 
 /* =========================================================
    MARK ACCOUNTS COMPLETED
