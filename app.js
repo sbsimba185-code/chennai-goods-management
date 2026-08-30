@@ -3091,3 +3091,1095 @@ if (accessToken) {
   showLogin();
 
 }
+/* =========================================================
+   STOCK CHECKING
+   ========================================================= */
+
+const stockTableElement =
+  document.getElementById("stock-table");
+
+const stockSearchElement =
+  document.getElementById("stock-search");
+
+const stockCountElement =
+  document.getElementById("stock-count");
+
+const stockPendingCountElement =
+  document.getElementById("stock-pending-count");
+
+const stockFoundCountElement =
+  document.getElementById("stock-found-count");
+
+const stockNotFoundCountElement =
+  document.getElementById("stock-not-found-count");
+
+
+let stockShipments = [];
+
+
+/* =========================================================
+   STOCK DATE
+   ========================================================= */
+
+function stockToday() {
+
+  const now = new Date();
+
+  const year =
+    now.getFullYear();
+
+  const month =
+    String(
+      now.getMonth() + 1
+    ).padStart(2, "0");
+
+  const day =
+    String(
+      now.getDate()
+    ).padStart(2, "0");
+
+  return (
+    year +
+    "-" +
+    month +
+    "-" +
+    day
+  );
+}
+
+
+/* =========================================================
+   STOCK ESCAPE HTML
+   ========================================================= */
+
+function stockEscapeHtml(value) {
+
+  if (value === null ||
+      value === undefined) {
+
+    return "";
+
+  }
+
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+
+/* =========================================================
+   LOAD STOCK
+   ========================================================= */
+
+async function loadStockPage() {
+
+  if (!stockTableElement) {
+    return;
+  }
+
+
+  const token =
+    sessionStorage.getItem(
+      "chennai_access_token"
+    );
+
+
+  if (!token) {
+
+    stockTableElement.innerHTML =
+      '<div class="stock-error">' +
+      'YOUR LOGIN SESSION HAS EXPIRED. PLEASE SIGN IN AGAIN.' +
+      '</div>';
+
+    return;
+  }
+
+
+  stockTableElement.innerHTML =
+    '<p class="empty">LOADING STOCK...</p>';
+
+
+  try {
+
+    /*
+     * Get shipments which have not yet
+     * been delivered.
+     */
+
+    const shipmentResponse =
+      await fetch(
+        SUPABASE_URL +
+        "/rest/v1/shipment_status_view" +
+        "?select=id,serial_no,received_date,lr_number,party_id,quantity,from_branch_id,current_status" +
+        "&delivery_date=is.null" +
+        "&order=received_date.asc,serial_no.asc",
+        {
+
+          method: "GET",
+
+          headers: {
+
+            "apikey":
+              SUPABASE_KEY,
+
+            "Authorization":
+              "Bearer " + token
+
+          }
+
+        }
+      );
+
+
+    const shipmentData =
+      await shipmentResponse.json();
+
+
+    if (!shipmentResponse.ok) {
+
+      console.error(
+        "STOCK SHIPMENT LOAD ERROR:",
+        shipmentData
+      );
+
+      throw new Error(
+        shipmentData.message ||
+        shipmentData.details ||
+        "UNABLE TO LOAD STOCK."
+      );
+
+    }
+
+
+    /*
+     * Get party names.
+     */
+
+    const partyResponse =
+      await fetch(
+        SUPABASE_URL +
+        "/rest/v1/parties" +
+        "?select=id,name",
+        {
+
+          method: "GET",
+
+          headers: {
+
+            "apikey":
+              SUPABASE_KEY,
+
+            "Authorization":
+              "Bearer " + token
+
+          }
+
+        }
+      );
+
+
+    const partyData =
+      await partyResponse.json();
+
+
+    if (!partyResponse.ok) {
+
+      throw new Error(
+        "UNABLE TO LOAD PARTIES."
+      );
+
+    }
+
+
+    /*
+     * Create party lookup.
+     */
+
+    const partyMap = {};
+
+    partyData.forEach(
+      function (party) {
+
+        partyMap[party.id] =
+          party.name;
+
+      }
+    );
+
+
+    /*
+     * Get branch names.
+     */
+
+    const branchResponse =
+      await fetch(
+        SUPABASE_URL +
+        "/rest/v1/branches" +
+        "?select=id,name",
+        {
+
+          method: "GET",
+
+          headers: {
+
+            "apikey":
+              SUPABASE_KEY,
+
+            "Authorization":
+              "Bearer " + token
+
+          }
+
+        }
+      );
+
+
+    const branchData =
+      await branchResponse.json();
+
+
+    if (!branchResponse.ok) {
+
+      throw new Error(
+        "UNABLE TO LOAD BRANCHES."
+      );
+
+    }
+
+
+    const branchMap = {};
+
+    branchData.forEach(
+      function (branch) {
+
+        branchMap[branch.id] =
+          branch.name;
+
+      }
+    );
+
+
+    /*
+     * Get stock check history.
+     *
+     * Ordered newest first so the first
+     * record for each shipment is its
+     * latest stock check.
+     */
+
+    const stockCheckResponse =
+      await fetch(
+        SUPABASE_URL +
+        "/rest/v1/stock_checks" +
+        "?select=shipment_id,checked_date,check_status,remarks,created_at" +
+        "&order=checked_date.desc,created_at.desc" +
+        "&limit=5000",
+        {
+
+          method: "GET",
+
+          headers: {
+
+            "apikey":
+              SUPABASE_KEY,
+
+            "Authorization":
+              "Bearer " + token
+
+          }
+
+        }
+      );
+
+
+    const stockCheckData =
+      await stockCheckResponse.json();
+
+
+    if (!stockCheckResponse.ok) {
+
+      console.error(
+        "STOCK CHECK LOAD ERROR:",
+        stockCheckData
+      );
+
+      throw new Error(
+        "UNABLE TO LOAD STOCK CHECKS."
+      );
+
+    }
+
+
+    /*
+     * Latest check per shipment.
+     */
+
+    const latestCheckMap = {};
+
+
+    stockCheckData.forEach(
+      function (check) {
+
+        if (
+          !latestCheckMap[
+            check.shipment_id
+          ]
+        ) {
+
+          latestCheckMap[
+            check.shipment_id
+          ] = check;
+
+        }
+
+      }
+    );
+
+
+    /*
+     * Build final stock records.
+     */
+
+    stockShipments =
+      (shipmentData || []).map(
+        function (shipment) {
+
+          return {
+
+            id:
+              shipment.id,
+
+            serial_no:
+              shipment.serial_no,
+
+            received_date:
+              shipment.received_date,
+
+            lr_number:
+              shipment.lr_number,
+
+            party_name:
+              partyMap[
+                shipment.party_id
+              ] || "UNKNOWN PARTY",
+
+            branch_name:
+              branchMap[
+                shipment.from_branch_id
+              ] || "UNKNOWN BRANCH",
+
+            quantity:
+              shipment.quantity,
+
+            latest_check:
+              latestCheckMap[
+                shipment.id
+              ] || null
+
+          };
+
+        }
+      );
+
+
+    renderStockTable();
+
+
+  } catch (error) {
+
+    console.error(
+      "STOCK PAGE ERROR:",
+      error
+    );
+
+
+    stockTableElement.innerHTML =
+      '<div class="stock-error">' +
+      stockEscapeHtml(
+        error.message
+      ) +
+      '</div>';
+
+  }
+
+}
+
+
+/* =========================================================
+   RENDER STOCK TABLE
+   ========================================================= */
+
+function renderStockTable() {
+
+  if (!stockTableElement) {
+    return;
+  }
+
+
+  const searchText =
+    stockSearchElement
+      ? stockSearchElement.value
+          .trim()
+          .toUpperCase()
+      : "";
+
+
+  const filtered =
+    stockShipments.filter(
+      function (shipment) {
+
+        if (!searchText) {
+          return true;
+        }
+
+
+        const combined =
+          (
+            String(
+              shipment.serial_no || ""
+            ) +
+            " " +
+            String(
+              shipment.lr_number || ""
+            ) +
+            " " +
+            String(
+              shipment.party_name || ""
+            ) +
+            " " +
+            String(
+              shipment.branch_name || ""
+            )
+          ).toUpperCase();
+
+
+        return combined.includes(
+          searchText
+        );
+
+      }
+    );
+
+
+  /*
+   * Counts
+   */
+
+  let pendingCount = 0;
+  let foundCount = 0;
+  let notFoundCount = 0;
+
+
+  stockShipments.forEach(
+    function (shipment) {
+
+      if (!shipment.latest_check) {
+
+        pendingCount++;
+
+      } else if (
+        shipment.latest_check.check_status ===
+        "IN GODOWN"
+      ) {
+
+        foundCount++;
+
+      } else if (
+        shipment.latest_check.check_status ===
+        "NOT FOUND"
+      ) {
+
+        notFoundCount++;
+
+      }
+
+    }
+  );
+
+
+  if (stockPendingCountElement) {
+
+    stockPendingCountElement.textContent =
+      pendingCount;
+
+  }
+
+
+  if (stockFoundCountElement) {
+
+    stockFoundCountElement.textContent =
+      foundCount;
+
+  }
+
+
+  if (stockNotFoundCountElement) {
+
+    stockNotFoundCountElement.textContent =
+      notFoundCount;
+
+  }
+
+
+  if (stockCountElement) {
+
+    stockCountElement.textContent =
+      pendingCount;
+
+  }
+
+
+  if (!filtered.length) {
+
+    stockTableElement.innerHTML =
+      '<div class="stock-empty">' +
+      (
+        stockShipments.length
+          ? "NO STOCK MATCHES YOUR SEARCH."
+          : "NO GOODS ARE CURRENTLY PENDING DELIVERY."
+      ) +
+      '</div>';
+
+    return;
+
+  }
+
+
+  let html = "";
+
+  html +=
+    '<div class="stock-table-wrapper">';
+
+  html +=
+    '<table class="stock-table">';
+
+  html += "<thead>";
+
+  html += "<tr>";
+
+  html += "<th>SERIAL NO</th>";
+
+  html += "<th>LR NUMBER</th>";
+
+  html += "<th>PARTY</th>";
+
+  html += "<th>FROM BRANCH</th>";
+
+  html += "<th>QTY</th>";
+
+  html += "<th>RECEIVED</th>";
+
+  html += "<th>LAST CHECK</th>";
+
+  html += "<th>STATUS</th>";
+
+  html += "<th>ACTION</th>";
+
+  html += "</tr>";
+
+  html += "</thead>";
+
+  html += "<tbody>";
+
+
+  filtered.forEach(
+    function (shipment) {
+
+      const check =
+        shipment.latest_check;
+
+
+      let statusText =
+        "PENDING CHECK";
+
+      let statusClass =
+        "pending";
+
+
+      if (check) {
+
+        if (
+          check.check_status ===
+          "IN GODOWN"
+        ) {
+
+          statusText =
+            "IN GODOWN";
+
+          statusClass =
+            "found";
+
+        } else if (
+          check.check_status ===
+          "NOT FOUND"
+        ) {
+
+          statusText =
+            "NOT FOUND";
+
+          statusClass =
+            "not-found";
+
+        }
+
+      }
+
+
+      html += "<tr>";
+
+
+      html +=
+        '<td class="stock-serial">' +
+        stockEscapeHtml(
+          shipment.serial_no
+        ) +
+        "</td>";
+
+
+      html +=
+        '<td class="stock-lr">' +
+        stockEscapeHtml(
+          shipment.lr_number
+        ) +
+        "</td>";
+
+
+      html +=
+        '<td class="stock-party">' +
+        stockEscapeHtml(
+          shipment.party_name
+        ) +
+        "</td>";
+
+
+      html +=
+        "<td>" +
+        stockEscapeHtml(
+          shipment.branch_name
+        ) +
+        "</td>";
+
+
+      html +=
+        "<td>" +
+        stockEscapeHtml(
+          shipment.quantity
+        ) +
+        "</td>";
+
+
+      html +=
+        '<td class="stock-date">' +
+        stockEscapeHtml(
+          shipment.received_date
+        ) +
+        "</td>";
+
+
+      html +=
+        '<td class="stock-last-check">' +
+        (
+          check
+            ? stockEscapeHtml(
+                check.checked_date
+              )
+            : "NOT CHECKED"
+        ) +
+        "</td>";
+
+
+      html +=
+        '<td>' +
+        '<span class="stock-status ' +
+        statusClass +
+        '">' +
+        statusText +
+        "</span>" +
+        "</td>";
+
+
+      html +=
+        '<td>' +
+        '<div class="stock-action-area">';
+
+
+      html +=
+        '<input ' +
+        'type="text" ' +
+        'class="stock-remark-input" ' +
+        'id="stock-remark-' +
+        shipment.id +
+        '" ' +
+        'placeholder="REMARKS" ' +
+        'value="' +
+        stockEscapeHtml(
+          check
+            ? check.remarks || ""
+            : ""
+        ) +
+        '">';
+
+
+      html +=
+        '<button ' +
+        'type="button" ' +
+        'class="stock-action-button found" ' +
+        'data-stock-id="' +
+        shipment.id +
+        '" ' +
+        'data-stock-status="IN GODOWN">' +
+        'IN GODOWN' +
+        "</button>";
+
+
+      html +=
+        '<button ' +
+        'type="button" ' +
+        'class="stock-action-button not-found" ' +
+        'data-stock-id="' +
+        shipment.id +
+        '" ' +
+        'data-stock-status="NOT FOUND">' +
+        'NOT FOUND' +
+        "</button>";
+
+
+      html +=
+        "</div>";
+
+      html += "</td>";
+
+      html += "</tr>";
+
+    }
+  );
+
+
+  html += "</tbody>";
+
+  html += "</table>";
+
+  html += "</div>";
+
+
+  stockTableElement.innerHTML =
+    html;
+
+
+  /*
+   * Attach buttons after rendering.
+   */
+
+  document
+    .querySelectorAll(
+      ".stock-action-button"
+    )
+    .forEach(
+      function (button) {
+
+        button.addEventListener(
+          "click",
+          async function () {
+
+            const shipmentId =
+              button.dataset.stockId;
+
+            const status =
+              button.dataset.stockStatus;
+
+
+            const remarkInput =
+              document.getElementById(
+                "stock-remark-" +
+                shipmentId
+              );
+
+
+            const remarks =
+              remarkInput
+                ? remarkInput.value
+                    .trim()
+                    .toUpperCase()
+                : "";
+
+
+            await saveStockCheck(
+              shipmentId,
+              status,
+              remarks
+            );
+
+          }
+        );
+
+      }
+    );
+
+}
+
+
+/* =========================================================
+   SAVE STOCK CHECK
+   ========================================================= */
+
+async function saveStockCheck(
+  shipmentId,
+  checkStatus,
+  remarks
+) {
+
+  const token =
+    sessionStorage.getItem(
+      "chennai_access_token"
+    );
+
+
+  if (!token) {
+
+    alert(
+      "YOUR LOGIN SESSION HAS EXPIRED. PLEASE SIGN IN AGAIN."
+    );
+
+    showLogin();
+
+    return;
+
+  }
+
+
+  if (
+    ![
+      "IN GODOWN",
+      "NOT FOUND"
+    ].includes(checkStatus)
+  ) {
+
+    alert(
+      "INVALID STOCK STATUS."
+    );
+
+    return;
+
+  }
+
+
+  /*
+   * Disable buttons for this shipment
+   */
+
+  const buttons =
+    document.querySelectorAll(
+      '[data-stock-id="' +
+      shipmentId +
+      '"]'
+    );
+
+
+  buttons.forEach(
+    function (button) {
+
+      button.disabled = true;
+
+    }
+  );
+
+
+  try {
+
+    const today =
+      stockToday();
+
+
+    /*
+     * UPSERT means:
+     *
+     * If today's check already exists,
+     * update it.
+     *
+     * Otherwise create it.
+     */
+
+    const response =
+      await fetch(
+        SUPABASE_URL +
+        "/rest/v1/stock_checks" +
+        "?on_conflict=shipment_id,checked_date",
+        {
+
+          method: "POST",
+
+          headers: {
+
+            "apikey":
+              SUPABASE_KEY,
+
+            "Authorization":
+              "Bearer " + token,
+
+            "Content-Type":
+              "application/json",
+
+            "Prefer":
+              "resolution=merge-duplicates,return=representation"
+
+          },
+
+          body: JSON.stringify({
+
+            shipment_id:
+              shipmentId,
+
+            checked_date:
+              today,
+
+            check_status:
+              checkStatus,
+
+            remarks:
+              remarks || null
+
+          })
+
+        }
+      );
+
+
+    const data =
+      await response.json();
+
+
+    console.log(
+      "STOCK CHECK RESPONSE:",
+      data
+    );
+
+
+    if (!response.ok) {
+
+      console.error(
+        "STOCK CHECK SAVE ERROR:",
+        data
+      );
+
+
+      throw new Error(
+        data.message ||
+        data.details ||
+        data.hint ||
+        "UNABLE TO SAVE STOCK CHECK."
+      );
+
+    }
+
+
+    /*
+     * Success
+     */
+
+    alert(
+      "STOCK CHECK SAVED: " +
+      checkStatus
+    );
+
+
+    /*
+     * Reload stock data so the latest
+     * status immediately appears.
+     */
+
+    await loadStockPage();
+
+
+  } catch (error) {
+
+    console.error(
+      "STOCK CHECK ERROR:",
+      error
+    );
+
+
+    alert(
+      "ERROR: " +
+      error.message
+    );
+
+
+    buttons.forEach(
+      function (button) {
+
+        button.disabled = false;
+
+      }
+    );
+
+  }
+
+}
+
+
+/* =========================================================
+   STOCK SEARCH
+   ========================================================= */
+
+if (stockSearchElement) {
+
+  stockSearchElement.addEventListener(
+    "input",
+    function () {
+
+      renderStockTable();
+
+    }
+  );
+
+}
+
+
+/* =========================================================
+   OPEN STOCK PAGE
+   ========================================================= */
+
+const stockNavigationButton =
+  document.querySelector(
+    '[data-page="stock"]'
+  );
+
+
+if (stockNavigationButton) {
+
+  stockNavigationButton.addEventListener(
+    "click",
+    function () {
+
+      loadStockPage();
+
+    }
+  );
+
+}
+
+
+/* =========================================================
+   LOAD STOCK WHEN APP OPENS
+   ========================================================= */
+
+if (
+  sessionStorage.getItem(
+    "chennai_access_token"
+  )
+) {
+
+  /*
+   * Don't block application startup.
+   * Stock loads when the user opens
+   * the Stock Checking page.
+   */
+
+  console.log(
+    "STOCK CHECKING READY"
+  );
+
+}
