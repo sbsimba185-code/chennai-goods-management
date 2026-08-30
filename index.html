@@ -177,7 +177,18 @@
             class="nav-count"
           ></span>
         </button>
+          <button
+  class="nav-link"
+  data-page="stock"
+  type="button"
+>
+  <span>Stock Checking</span>
 
+  <span
+    id="stock-count"
+    class="nav-count"
+  ></span>
+</button>
 
         <button
           class="nav-link"
@@ -710,50 +721,105 @@
       </section>
 
 
-      <!-- =================================================
-           STOCK
-           ================================================= -->
+<!-- =================================================
+     STOCK CHECKING
+     ================================================= -->
 
-      <section
-        id="stock"
-        class="page"
+<section
+  id="stock"
+  class="page"
+>
+
+  <div class="section-card">
+
+    <div class="section-heading">
+
+      <div>
+
+        <p class="eyebrow">
+          GODOWN STOCK VERIFICATION
+        </p>
+
+        <h2>
+          Stock Checking
+        </h2>
+
+        <p>
+          Check whether received goods are currently available in the godown.
+        </p>
+
+      </div>
+
+      <input
+        id="stock-search"
+        class="search-input"
+        type="search"
+        placeholder="SEARCH LR, PARTY, SERIAL..."
       >
 
-        <div class="section-card">
-
-          <div class="section-heading">
-
-            <div>
-
-              <p class="eyebrow">
-                GODOWN
-              </p>
-
-              <h2>
-                Godown stock
-              </h2>
-
-            </div>
-
-          </div>
+    </div>
 
 
-          <div id="stock-table">
+    <!-- STOCK SUMMARY -->
 
-            <p class="empty">
-              Stock verification will be added later.
-            </p>
+    <div class="stock-summary">
 
-          </div>
+      <div class="stock-summary-item">
 
-        </div>
+        <span>
+          PENDING CHECK
+        </span>
 
-      </section>
+        <strong id="stock-pending-count">
+          0
+        </strong>
 
-    </main>
+      </div>
+
+
+      <div class="stock-summary-item">
+
+        <span>
+          IN GODOWN
+        </span>
+
+        <strong id="stock-found-count">
+          0
+        </strong>
+
+      </div>
+
+
+      <div class="stock-summary-item">
+
+        <span>
+          NOT FOUND
+        </span>
+
+        <strong id="stock-not-found-count">
+          0
+        </strong>
+
+      </div>
+
+    </div>
+
+
+    <!-- STOCK TABLE -->
+
+    <div id="stock-table">
+
+      <p class="empty">
+        Loading stock...
+      </p>
+
+    </div>
 
   </div>
 
+</section>
+
+      
 
   <!-- =====================================================
        DATE DIALOG
