@@ -3,1355 +3,256 @@
    COMPLETE APP.JS
    ========================================================= */
 
+
+/* =========================================================
+   SUPABASE CONFIGURATION
+   ========================================================= */
+
 const SUPABASE_URL =
   "https://yonxttybnkvxwnbhzwyi.supabase.co";
 
 const SUPABASE_KEY =
   "sb_publishable_EC6Tm1kbWuPEPtfeeJED9Q_6dbqOZVh";
 
-const OFFICE_EMAIL =
-  "silambarasan2453@gmail.com";
 
-const SESSION_KEY =
-  "chennai-goods-session";
+/* =========================================================
+   GLOBAL ELEMENTS
+   ========================================================= */
+
+const loginForm =
+  document.getElementById("login-form");
+
+const loginButton =
+  document.getElementById("login-button");
+
+const loginMessage =
+  document.getElementById("login-message");
+
+const loginScreen =
+  document.getElementById("login-screen");
+
+const appShell =
+  document.getElementById("app-shell");
+
+const shipmentForm =
+  document.getElementById("shipment-form");
+
+const formMessage =
+  document.getElementById("form-message");
+
+let accessToken =
+  sessionStorage.getItem("chennai_access_token");
 
 
 /* =========================================================
-   GLOBAL STATE
+   UTILITY
    ========================================================= */
 
-let token =
-  sessionStorage.getItem(SESSION_KEY);
+function normalizeUppercase(value) {
 
-let shipments = [];
-
-let currentAction = null;
-
-let editingId = null;
-
-
-/* =========================================================
-   HELPERS
-   ========================================================= */
-
-const $ = (selector) =>
-  document.querySelector(selector);
-
-
-const today = () =>
-  new Date()
-    .toISOString()
-    .slice(0, 10);
-
-
-const normalizeUppercase = (value) =>
-  String(value ?? "")
+  return String(value || "")
     .trim()
     .replace(/\s+/g, " ")
     .toUpperCase();
 
-
-const safe = (value) =>
-  String(value ?? "")
-    .replace(
-      /[&<>"']/g,
-      function (character) {
-        return {
-          "&": "&amp;",
-          "<": "&lt;",
-          ">": "&gt;",
-          '"': "&quot;",
-          "'": "&#39;"
-        }[character];
-      }
-    );
+}
 
 
-const formatDate = (value) => {
+function escapeHtml(value) {
 
-  if (!value) {
-    return "—";
-  }
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 
-  return new Intl.DateTimeFormat(
+}
+
+
+function formatAmount(value) {
+
+  const number =
+    Number(value || 0);
+
+  return number.toLocaleString(
     "en-IN",
     {
-      day: "2-digit",
-      month: "long",
-      year: "numeric"
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
     }
-  ).format(
-    new Date(`${value}T00:00:00`)
   );
-};
+
+}
 
 
-/* =========================================================
-   IMPORTANT WORKFLOW STATUS
-   =========================================================
+function formatDate(value) {
 
-   TOPAY:
-   received
-      ↓
-   delivery
-      ↓
-   accounts
-      ↓
-   completed
-
-   TBB / PAID:
-   received
-      ↓
-   delivery
-      ↓
-   completed
-
-   ========================================================= */
-
-function statusOf(shipment) {
-
-  /* TOPAY completed only after accounts date */
-
-  if (
-    shipment.payment_type === "TOPAY"
-  ) {
-
-    if (shipment.accounts_date) {
-      return "Completed";
-    }
-
-    if (shipment.delivery_date) {
-      return "Accounts pending";
-    }
-
-    return "Pending delivery";
+  if (!value) {
+    return "-";
   }
 
+  const parts =
+    String(value).split("-");
 
-  /* TBB and PAID completed immediately
-     after delivery */
-
-  if (
-    shipment.payment_type === "TBB" ||
-    shipment.payment_type === "PAID"
-  ) {
-
-    if (shipment.delivery_date) {
-      return "Completed";
-    }
-
-    return "Pending delivery";
+  if (parts.length !== 3) {
+    return value;
   }
 
+  return (
+    parts[2] +
+    "-" +
+    parts[1] +
+    "-" +
+    parts[0]
+  );
 
-  /* Safe fallback */
-
-  if (shipment.accounts_date) {
-    return "Completed";
-  }
-
-  if (shipment.delivery_date) {
-    return "Accounts pending";
-  }
-
-  return "Pending delivery";
 }
 
 
 /* =========================================================
-   SUPABASE API
+   SUPABASE HEADERS
    ========================================================= */
 
-function authHeaders(extra = {}) {
+function supabaseHeaders() {
+
+  const token =
+    sessionStorage.getItem(
+      "chennai_access_token"
+    );
 
   return {
-    apikey: SUPABASE_KEY,
 
-    Authorization:
-      `Bearer ${token}`,
+    "apikey":
+      SUPABASE_KEY,
 
-    ...extra
+    "Authorization":
+      "Bearer " + (token || accessToken || ""),
+
+    "Content-Type":
+      "application/json"
+
   };
+
 }
 
 
+/* =========================================================
+   SUPABASE API HELPER
+   ========================================================= */
+
 async function api(
-  path,
+  endpoint,
   options = {}
 ) {
 
   const response =
     await fetch(
-      `${SUPABASE_URL}/rest/v1/${path}`,
+      SUPABASE_URL + endpoint,
       {
         ...options,
-
-        headers:
-          authHeaders(
-            options.headers || {}
-          )
+        headers: {
+          ...supabaseHeaders(),
+          ...(options.headers || {})
+        }
       }
     );
+
+
+  const text =
+    await response.text();
+
+
+  let data = null;
+
+  if (text) {
+
+    try {
+
+      data =
+        JSON.parse(text);
+
+    } catch {
+
+      data =
+        text;
+
+    }
+
+  }
 
 
   if (!response.ok) {
 
-    const body =
-      await response
-        .json()
-        .catch(
-          () => ({})
-        );
-
-
-    throw new Error(
-      body.message ||
-      body.error_description ||
-      body.hint ||
-      body.details ||
-      `Cloud request failed (${response.status}).`
-    );
-  }
-
-
-  if (response.status === 204) {
-    return null;
-  }
-
-
-  return response.json();
-}
-
-
-/* =========================================================
-   LOAD SHIPMENTS
-   ========================================================= */
-
-async function load() {
-
-  const select =
-    "*,parties(party_name),branches(branch_name,branch_code)";
-
-
-  const rows =
-    await api(
-      `shipments?${new URLSearchParams({
-        select,
-        order: "created_at.desc"
-      })}`
-    );
-
-
-  shipments =
-    rows.map(
-      function (shipment) {
-
-        return {
-          ...shipment,
-
-          party_name:
-            shipment.parties?.party_name ||
-            "",
-
-          branch_name:
-            shipment.branches?.branch_name ||
-            shipment.branches?.branch_code ||
-            ""
-        };
-
-      }
-    );
-
-
-  render();
-}
-
-
-/* =========================================================
-   PARTY
-   ========================================================= */
-
-async function getOrCreateParty(
-  name
-) {
-
-  const cleanName =
-    normalizeUppercase(name);
-
-
-  const query =
-    new URLSearchParams({
-
-      select: "id",
-
-      party_name:
-        `eq.${cleanName}`,
-
-      limit: "1"
-
-    });
-
-
-  const existing =
-    await api(
-      `parties?${query}`
-    );
-
-
-  if (existing[0]) {
-
-    return existing[0].id;
-  }
-
-
-  const created =
-    await api(
-      "parties",
-      {
-        method: "POST",
-
-        headers: {
-          "Content-Type":
-            "application/json",
-
-          Prefer:
-            "return=representation"
-        },
-
-        body:
-          JSON.stringify([
-            {
-              party_name:
-                cleanName,
-
-              active:
-                true
-            }
-          ])
-      }
-    );
-
-
-  return created[0].id;
-}
-
-
-/* =========================================================
-   BRANCH
-   ========================================================= */
-
-async function getOrCreateBranch(
-  name
-) {
-
-  const cleanName =
-    normalizeUppercase(name);
-
-
-  const query =
-    new URLSearchParams({
-
-      select: "id",
-
-      branch_code:
-        `eq.${cleanName}`,
-
-      limit: "1"
-
-    });
-
-
-  const existing =
-    await api(
-      `branches?${query}`
-    );
-
-
-  if (existing[0]) {
-
-    return existing[0].id;
-  }
-
-
-  const created =
-    await api(
-      "branches",
-      {
-        method: "POST",
-
-        headers: {
-          "Content-Type":
-            "application/json",
-
-          Prefer:
-            "return=representation"
-        },
-
-        body:
-          JSON.stringify([
-            {
-              branch_code:
-                cleanName,
-
-              branch_name:
-                cleanName,
-
-              active:
-                true
-            }
-          ])
-      }
-    );
-
-
-  return created[0].id;
-}
-
-
-/* =========================================================
-   ACTION BUTTON
-   ========================================================= */
-
-function button(
-  type,
-  shipment,
-  label,
-  kind = ""
-) {
-
-  return `
-    <button
-      type="button"
-      class="action ${kind}"
-      data-action="${type}"
-      data-id="${shipment.id}"
-    >
-      ${label}
-    </button>
-  `;
-}
-
-
-/* =========================================================
-   TABLE ROW
-   ========================================================= */
-
-function row(
-  shipment,
-  mode
-) {
-
-  const status =
-    statusOf(shipment);
-
-
-  const statusClass =
-    status === "Completed"
-      ? "completed"
-      : status === "Accounts pending"
-        ? "accounts"
-        : "pending";
-
-
-  let actions = "";
-
-
-  /* =====================================================
-     WORKFLOW ACTIONS
-     ===================================================== */
-
-  if (mode === "workflow") {
-
-    if (
-      status ===
-      "Pending delivery"
-    ) {
-
-      actions =
-        button(
-          "deliver",
-          shipment,
-          "Delivery"
-        );
-
-    }
-
-    else if (
-      status ===
-      "Accounts pending"
-    ) {
-
-      /*
-       * This can only be TOPAY
-       */
-
-      actions =
-        button(
-          "accounts",
-          shipment,
-          "Enter A/C date"
-        ) +
-
-        button(
-          "undelivered",
-          shipment,
-          "Mark undelivered",
-          "light"
-        );
-
-    }
-
-    else {
-
-      /*
-       * Completed shipments
-       * can still be reversed
-       */
-
-      actions =
-        button(
-          "undelivered",
-          shipment,
-          "Mark undelivered",
-          "light"
-        );
-    }
-  }
-
-
-  /* =====================================================
-     ALL SHIPMENTS ACTIONS
-     ===================================================== */
-
-  if (mode === "all") {
-
-    actions =
-      (
-        shipment.delivery_date
-          ? button(
-              "undelivered",
-              shipment,
-              "Mark undelivered",
-              "light"
-            )
-          : ""
-      ) +
-
-      button(
-        "edit",
-        shipment,
-        "Edit",
-        "light"
-      ) +
-
-      button(
-        "delete",
-        shipment,
-        "Delete",
-        "danger"
-      );
-  }
-
-
-  return `
-    <tr>
-
-      <td>
-        <b>
-          ${safe(
-            shipment.lr_number
-          )}
-        </b>
-      </td>
-
-      <td>
-        ${safe(
-          shipment.party_name
-        )}
-      </td>
-
-      <td>
-        ${safe(
-          shipment.branch_name
-        )}
-      </td>
-
-      <td>
-        ${safe(
-          shipment.quantity
-        )}
-      </td>
-
-      <td>
-        ₹${Number(
-          shipment.amount || 0
-        ).toLocaleString("en-IN")}
-      </td>
-
-      <td>
-        ${safe(
-          shipment.remarks
-        ) || "—"}
-      </td>
-
-      <td>
-        ${formatDate(
-          shipment.delivery_date
-        )}
-      </td>
-
-      <td>
-        ${formatDate(
-          shipment.accounts_date
-        )}
-      </td>
-
-      <td>
-        ${formatDate(
-          shipment.received_date
-        )}
-      </td>
-
-      <td>
-
-        <span
-          class="badge ${statusClass}"
-        >
-          ${status}
-        </span>
-
-      </td>
-
-      ${
-        mode
-          ? `
-            <td class="actions">
-              ${actions}
-            </td>
-          `
-          : ""
-      }
-
-    </tr>
-  `;
-}
-
-
-/* =========================================================
-   TABLE
-   ========================================================= */
-
-function table(
-  data,
-  target,
-  mode = false
-) {
-
-  const element =
-    $(target);
-
-
-  if (!element) {
-    return;
-  }
-
-
-  const headers = `
-    <th>LR NO.</th>
-    <th>PARTY</th>
-    <th>FROM</th>
-    <th>QTY</th>
-    <th>AMOUNT</th>
-    <th>REMARKS</th>
-    <th>DELIVERY DATE</th>
-    <th>A/C DATE</th>
-    <th>RECEIVED</th>
-    <th>STATUS</th>
-  `;
-
-
-  element.innerHTML =
-    data.length
-
-      ? `
-        <div class="table-wrap">
-
-          <table>
-
-            <thead>
-
-              <tr>
-
-                ${headers}
-
-                ${
-                  mode
-                    ? "<th></th>"
-                    : ""
-                }
-
-              </tr>
-
-            </thead>
-
-            <tbody>
-
-              ${data
-                .map(
-                  function (shipment) {
-                    return row(
-                      shipment,
-                      mode
-                    );
-                  }
-                )
-                .join("")}
-
-            </tbody>
-
-          </table>
-
-        </div>
-      `
-
-      : `
-        <p class="empty">
-          NO SHIPMENTS FOUND.
-        </p>
-      `;
-}
-
-
-/* =========================================================
-   RENDER
-   ========================================================= */
-
-function render() {
-
-  /* -----------------------------------------------------
-     DELIVERY
-     All shipments without delivery date
-     TOPAY + TBB + PAID
-     ----------------------------------------------------- */
-
-  const pending =
-    shipments.filter(
-      function (shipment) {
-
-        return !shipment.delivery_date;
-
-      }
-    );
-
-
-  /* -----------------------------------------------------
-     ACCOUNTS
-
-     ONLY TOPAY
-     AND already delivered
-     AND accounts date not entered
-     ----------------------------------------------------- */
-
-  const accountsPending =
-    shipments.filter(
-      function (shipment) {
-
-        return (
-          shipment.payment_type ===
-            "TOPAY" &&
-
-          !!shipment.delivery_date &&
-
-          !shipment.accounts_date
-        );
-
-      }
-    );
-
-
-  /* -----------------------------------------------------
-     COMPLETED
-
-     TOPAY:
-       accounts_date exists
-
-     TBB / PAID:
-       delivery_date exists
-     ----------------------------------------------------- */
-
-  const completed =
-    shipments.filter(
-      function (shipment) {
-
-        return (
-          (
-            shipment.payment_type ===
-              "TOPAY" &&
-
-            !!shipment.accounts_date
-          )
-
-          ||
-
-          (
-            (
-              shipment.payment_type ===
-                "TBB" ||
-
-              shipment.payment_type ===
-                "PAID"
-            ) &&
-
-            !!shipment.delivery_date
-          )
-        );
-
-      }
-    );
-
-
-  /* -----------------------------------------------------
-     RECEIVED TODAY
-     ----------------------------------------------------- */
-
-  const receivedToday =
-    shipments.filter(
-      function (shipment) {
-
-        return (
-          shipment.received_date ===
-          today()
-        );
-
-      }
-    );
-
-
-  /* -----------------------------------------------------
-     COMPLETED TODAY
-     ----------------------------------------------------- */
-
-  const completedToday =
-    completed.filter(
-      function (shipment) {
-
-        /*
-         * TOPAY uses accounts date
-         */
-
-        if (
-          shipment.payment_type ===
-          "TOPAY"
-        ) {
-
-          return (
-            shipment.accounts_date ===
-            today()
-          );
-        }
-
-
-        /*
-         * TBB / PAID use delivery date
-         */
-
-        return (
-          shipment.delivery_date ===
-          today()
-        );
-
-      }
-    );
-
-
-  /* -----------------------------------------------------
-     DASHBOARD
-     ----------------------------------------------------- */
-
-  const receivedStat =
-    $("#stat-received");
-
-  const deliveryStat =
-    $("#stat-delivery");
-
-  const accountsStat =
-    $("#stat-accounts");
-
-  const completedStat =
-    $("#stat-completed");
-
-
-  if (receivedStat) {
-
-    receivedStat.textContent =
-      receivedToday.length;
-  }
-
-
-  if (deliveryStat) {
-
-    deliveryStat.textContent =
-      pending.length;
-  }
-
-
-  if (accountsStat) {
-
-    accountsStat.textContent =
-      accountsPending.length;
-  }
-
-
-  if (completedStat) {
-
-    completedStat.textContent =
-      completedToday.length;
-  }
-
-
-  /* -----------------------------------------------------
-     SIDEBAR COUNTS
-     ----------------------------------------------------- */
-
-  const deliveryCount =
-    $("#delivery-count");
-
-  if (deliveryCount) {
-
-    deliveryCount.textContent =
-      pending.length || "";
-  }
-
-
-  const accountsCount =
-    $("#accounts-count");
-
-  if (accountsCount) {
-
-    accountsCount.textContent =
-      accountsPending.length || "";
-  }
-
-
-  /* -----------------------------------------------------
-     TABLES
-     ----------------------------------------------------- */
-
-  table(
-    shipments.slice(0, 6),
-    "#recent-table"
-  );
-
-
-  table(
-    pending,
-    "#delivery-table",
-    "workflow"
-  );
-
-
-  table(
-    accountsPending,
-    "#accounts-table",
-    "workflow"
-  );
-
-
-  table(
-    shipments,
-    "#all-table",
-    "all"
-  );
-
-
-  /* -----------------------------------------------------
-     PARTY DATALIST
-     ----------------------------------------------------- */
-
-  const parties =
-    [
-      ...new Set(
-        shipments
-          .map(
-            (shipment) =>
-              shipment.party_name
-          )
-          .filter(Boolean)
-      )
-    ]
-      .sort(
-        (a, b) =>
-          a.localeCompare(b)
-      );
-
-
-  const partyList =
-    $("#party-list");
-
-
-  if (partyList) {
-
-    partyList.innerHTML =
-      parties
-        .map(
-          function (name) {
-
-            return `
-              <option
-                value="${safe(name)}"
-              >
-            `;
-
-          }
-        )
-        .join("");
-  }
-
-
-  /* -----------------------------------------------------
-     BRANCH DATALIST
-     ----------------------------------------------------- */
-
-  const branches =
-    [
-      ...new Set(
-        shipments
-          .map(
-            (shipment) =>
-              shipment.branch_name
-          )
-          .filter(Boolean)
-      )
-    ]
-      .sort(
-        (a, b) =>
-          a.localeCompare(b)
-      );
-
-
-  const branchList =
-    $("#branch-list");
-
-
-  if (branchList) {
-
-    branchList.innerHTML =
-      branches
-        .map(
-          function (name) {
-
-            return `
-              <option
-                value="${safe(name)}"
-              >
-            `;
-
-          }
-        )
-        .join("");
-  }
-}
-
-
-/* =========================================================
-   PAGE NAVIGATION
-   ========================================================= */
-
-function showPage(
-  page
-) {
-
-  document
-    .querySelectorAll(".page")
-    .forEach(
-      function (element) {
-
-        element.classList.toggle(
-          "active",
-          element.id === page
-        );
-
-      }
-    );
-
-
-  document
-    .querySelectorAll(".nav-link")
-    .forEach(
-      function (element) {
-
-        element.classList.toggle(
-          "active",
-          element.dataset.page ===
-            page
-        );
-
-      }
-    );
-
-
-  const titles = {
-
-    dashboard: [
-      "Good morning",
-      "CHENNAI BRANCH"
-    ],
-
-    receive: [
-      editingId
-        ? "Edit shipment"
-        : "Receive goods",
-      "NEW GOODS ENTRY"
-    ],
-
-    delivery: [
-      "Pending delivery",
-      "CHENNAI BRANCH"
-    ],
-
-    accounts: [
-      "Accounts pending",
-      "CHENNAI BRANCH"
-    ],
-
-    stock: [
-      "Godown stock check",
-      "DAILY PHYSICAL VERIFICATION"
-    ],
-
-    all: [
-      "All shipments",
-      "CHENNAI BRANCH"
-    ]
-
-  };
-
-
-  const title =
-    titles[page] ||
-    titles.dashboard;
-
-
-  const pageTitle =
-    $("#page-title");
-
-  const pageKicker =
-    $("#page-kicker");
-
-
-  if (pageTitle) {
-
-    pageTitle.textContent =
-      title[0];
-  }
-
-
-  if (pageKicker) {
-
-    pageKicker.textContent =
-      title[1];
-  }
-
-
-  const receiveButton =
-    $("#receive-button");
-
-
-  if (receiveButton) {
-
-    receiveButton.style.display =
-      page === "receive"
-        ? "none"
-        : "";
-  }
-}
-
-
-/* =========================================================
-   RESET FORM
-   ========================================================= */
-
-function resetForm() {
-
-  editingId = null;
-
-
-  const form =
-    $("#shipment-form");
-
-
-  if (!form) {
-    return;
-  }
-
-
-  form.reset();
-
-
-  if (
-    form.elements.received_date
-  ) {
-
-    form.elements.received_date.value =
-      today();
-  }
-
-
-  const submitButton =
-    form.querySelector(
-      '[type="submit"]'
-    );
-
-
-  if (submitButton) {
-
-    submitButton.textContent =
-      "Save goods receipt";
-  }
-
-
-  const message =
-    $("#form-message");
-
-
-  if (message) {
-
-    message.textContent =
-      "";
-  }
-}
-
-
-/* =========================================================
-   EDIT SHIPMENT
-   ========================================================= */
-
-function editShipment(
-  shipment
-) {
-
-  editingId =
-    shipment.id;
-
-
-  const form =
-    $("#shipment-form");
-
-
-  if (!form) {
-    return;
-  }
-
-
-  form.elements.received_date.value =
-    shipment.received_date || "";
-
-
-  form.elements.lr_number.value =
-    shipment.lr_number || "";
-
-
-  form.elements.party_name.value =
-    shipment.party_name || "";
-
-
-  form.elements.branch_name.value =
-    shipment.branch_name || "";
-
-
-  form.elements.quantity.value =
-    shipment.quantity ?? "";
-
-
-  form.elements.amount.value =
-    shipment.amount ?? "";
-
-
-  form.elements.payment_type.value =
-    shipment.payment_type ||
-    "TOPAY";
-
-
-  form.elements.remarks.value =
-    shipment.remarks || "";
-
-
-  const submitButton =
-    form.querySelector(
-      '[type="submit"]'
-    );
-
-
-  if (submitButton) {
-
-    submitButton.textContent =
-      "Save changes";
-  }
-
-
-  showPage("receive");
-}
-
-
-/* =========================================================
-   CLOUD ACTION
-   ========================================================= */
-
-async function cloudAction(
-  action
-) {
-
-  try {
-
-    await action();
-
-    await load();
-
-  }
-
-  catch (error) {
-
     console.error(
-      "CLOUD ACTION ERROR:",
-      error
+      "SUPABASE API ERROR:",
+      endpoint,
+      data
     );
 
 
-    alert(
-      error.message ||
-      "Something went wrong."
-    );
+    const message =
+      data?.message ||
+      data?.details ||
+      data?.hint ||
+      data?.error_description ||
+      data?.error ||
+      "SUPABASE REQUEST FAILED.";
+
+    throw new Error(message);
+
   }
+
+
+  return data;
+
 }
 
 
 /* =========================================================
-   LOGIN / APP
+   LOGIN SCREEN
    ========================================================= */
-
-function showApp() {
-
-  $("#login-screen").style.display =
-    "none";
-
-  $("#app-shell").hidden =
-    false;
-
-  $("#app-shell").style.display =
-    "block";
-}
-
 
 function showLogin() {
 
-  $("#app-shell").style.display =
-    "none";
+  if (loginScreen) {
 
-  $("#app-shell").hidden =
-    true;
+    loginScreen.hidden = false;
+    loginScreen.style.display = "grid";
 
-  $("#login-screen").style.display =
-    "grid";
+  }
+
+
+  if (appShell) {
+
+    appShell.hidden = true;
+    appShell.style.display = "none";
+
+  }
+
+}
+
+
+async function showApp() {
+
+  if (loginScreen) {
+
+    loginScreen.hidden = true;
+    loginScreen.style.display = "none";
+
+  }
+
+
+  if (appShell) {
+
+    appShell.hidden = false;
+    appShell.style.display = "block";
+
+  }
+
+
+  await loadAllData();
+
 }
 
 
@@ -1359,134 +260,129 @@ function showLogin() {
    LOGIN
    ========================================================= */
 
-$("#login-form")
-  .addEventListener(
+if (loginForm) {
+
+  loginForm.addEventListener(
     "submit",
     async function (event) {
 
       event.preventDefault();
 
 
-      const message =
-        $("#login-message");
+      const email =
+        document
+          .getElementById("login-email")
+          ?.value
+          .trim();
 
 
       const password =
-        $("#login-password")
-          .value;
+        document
+          .getElementById("login-password")
+          ?.value;
 
 
       if (!password) {
 
-        message.textContent =
-          "ENTER YOUR PASSWORD.";
+        loginMessage.textContent =
+          "PLEASE ENTER YOUR PASSWORD.";
 
         return;
+
       }
 
 
-      message.textContent =
+      loginButton.disabled = true;
+      loginButton.textContent =
         "SIGNING IN...";
+
+      loginMessage.textContent =
+        "PLEASE WAIT...";
 
 
       try {
 
         const response =
           await fetch(
-            `${SUPABASE_URL}/auth/v1/token?grant_type=password`,
+            SUPABASE_URL +
+            "/auth/v1/token?grant_type=password",
             {
-
               method: "POST",
 
               headers: {
-
-                apikey:
+                "apikey":
                   SUPABASE_KEY,
 
                 "Content-Type":
                   "application/json"
-
               },
 
               body:
                 JSON.stringify({
                   email:
-                    OFFICE_EMAIL,
+                    email,
 
                   password:
                     password
                 })
-
             }
           );
 
 
         const data =
-          await response
-            .json()
-            .catch(
-              () => ({})
-            );
+          await response.json();
 
 
-        if (
-          !response.ok ||
-          !data.access_token
-        ) {
+        console.log(
+          "SUPABASE LOGIN RESPONSE:",
+          data
+        );
 
-          message.textContent =
+
+        if (!response.ok) {
+
+          throw new Error(
             data.error_description ||
             data.msg ||
-            "SIGN-IN FAILED. CHECK YOUR PASSWORD.";
+            data.message ||
+            "LOGIN FAILED."
+          );
 
-          return;
         }
 
 
-        token =
+        if (!data.access_token) {
+
+          throw new Error(
+            "NO LOGIN TOKEN WAS RETURNED."
+          );
+
+        }
+
+
+        accessToken =
           data.access_token;
 
 
         sessionStorage.setItem(
-          SESSION_KEY,
-          token
+          "chennai_access_token",
+          accessToken
         );
 
 
-        showApp();
+        loginMessage.textContent =
+          "";
 
 
-        try {
-
-          await load();
-
-          showPage(
-            "dashboard"
-          );
-
-          message.textContent =
-            "";
-
-        }
-
-        catch (error) {
-
-          console.error(
-            "DASHBOARD LOAD FAILED:",
-            error
-          );
+        await showApp();
 
 
-          message.textContent =
-            "LOGIN SUCCEEDED, BUT DASHBOARD COULD NOT LOAD.";
+        console.log(
+          "LOGIN SUCCESSFUL"
+        );
 
 
-          showLogin();
-        }
-
-      }
-
-      catch (error) {
+      } catch (error) {
 
         console.error(
           "LOGIN ERROR:",
@@ -1494,45 +390,2414 @@ $("#login-form")
         );
 
 
-        message.textContent =
-          "COULD NOT CONNECT TO THE CLOUD.";
+        loginMessage.textContent =
+          String(
+            error.message
+          ).toUpperCase();
+
+
+      } finally {
+
+        loginButton.disabled =
+          false;
+
+        loginButton.textContent =
+          "SIGN IN";
+
       }
 
     }
   );
+
+}
 
 
 /* =========================================================
    SIGN OUT
    ========================================================= */
 
-$("#sign-out")
-  .addEventListener(
+const signOutButton =
+  document.getElementById(
+    "sign-out"
+  );
+
+
+if (signOutButton) {
+
+  signOutButton.addEventListener(
     "click",
     function () {
 
-      token = null;
+      accessToken =
+        null;
+
 
       sessionStorage.removeItem(
-        SESSION_KEY
+        "chennai_access_token"
       );
 
 
-      $("#login-password")
-        .value = "";
+      const passwordInput =
+        document.getElementById(
+          "login-password"
+        );
 
 
-      $("#login-message")
-        .textContent = "";
+      if (passwordInput) {
+
+        passwordInput.value =
+          "";
+
+      }
 
 
       showLogin();
+
+    }
+  );
+
+}
+
+
+/* =========================================================
+   LOAD PARTIES
+   ========================================================= */
+
+async function loadParties() {
+
+  const partyList =
+    document.getElementById(
+      "party-list"
+    );
+
+
+  if (!partyList) {
+    return;
+  }
+
+
+  try {
+
+    const parties =
+      await api(
+        "/rest/v1/parties" +
+        "?select=id,name,phone" +
+        "&is_active=eq.true" +
+        "&order=name.asc" +
+        "&limit=1000"
+      );
+
+
+    partyList.innerHTML =
+      "";
+
+
+    (parties || []).forEach(
+      function (party) {
+
+        const option =
+          document.createElement(
+            "option"
+          );
+
+
+        option.value =
+          normalizeUppercase(
+            party.name
+          );
+
+
+        partyList.appendChild(
+          option
+        );
+
+      }
+    );
+
+
+    console.log(
+      "PARTIES LOADED:",
+      parties?.length || 0
+    );
+
+
+  } catch (error) {
+
+    console.error(
+      "PARTY LOAD ERROR:",
+      error
+    );
+
+  }
+
+}
+
+
+/* =========================================================
+   LOAD BRANCHES
+   ========================================================= */
+
+async function loadBranches() {
+
+  const branchList =
+    document.getElementById(
+      "branch-list"
+    );
+
+
+  if (!branchList) {
+    return;
+  }
+
+
+  try {
+
+    const branches =
+      await api(
+        "/rest/v1/branches" +
+        "?select=id,name" +
+        "&is_active=eq.true" +
+        "&order=name.asc" +
+        "&limit=1000"
+      );
+
+
+    branchList.innerHTML =
+      "";
+
+
+    (branches || []).forEach(
+      function (branch) {
+
+        const option =
+          document.createElement(
+            "option"
+          );
+
+
+        option.value =
+          normalizeUppercase(
+            branch.name
+          );
+
+
+        branchList.appendChild(
+          option
+        );
+
+      }
+    );
+
+
+    console.log(
+      "BRANCHES LOADED:",
+      branches?.length || 0
+    );
+
+
+  } catch (error) {
+
+    console.error(
+      "BRANCH LOAD ERROR:",
+      error
+    );
+
+  }
+
+}
+
+
+/* =========================================================
+   FIND PARTY
+   ========================================================= */
+
+async function findPartyId(
+  partyName
+) {
+
+  const name =
+    normalizeUppercase(
+      partyName
+    );
+
+
+  const encoded =
+    encodeURIComponent(name);
+
+
+  const data =
+    await api(
+      "/rest/v1/parties" +
+      "?select=id,name" +
+      "&name=eq." +
+      encoded +
+      "&is_active=eq.true" +
+      "&limit=1"
+    );
+
+
+  if (!data || !data.length) {
+
+    throw new Error(
+      "PARTY NOT FOUND. PLEASE CREATE THE PARTY FIRST."
+    );
+
+  }
+
+
+  return data[0].id;
+
+}
+
+
+/* =========================================================
+   FIND BRANCH
+   ========================================================= */
+
+async function findBranchId(
+  branchName
+) {
+
+  const name =
+    normalizeUppercase(
+      branchName
+    );
+
+
+  const encoded =
+    encodeURIComponent(name);
+
+
+  const data =
+    await api(
+      "/rest/v1/branches" +
+      "?select=id,name" +
+      "&name=eq." +
+      encoded +
+      "&is_active=eq.true" +
+      "&limit=1"
+    );
+
+
+  if (!data || !data.length) {
+
+    throw new Error(
+      "BRANCH NOT FOUND. PLEASE CREATE THE BRANCH FIRST."
+    );
+
+  }
+
+
+  return data[0].id;
+
+}
+
+
+/* =========================================================
+   CREATE PARTY
+   ========================================================= */
+
+async function createParty(
+  name
+) {
+
+  const partyName =
+    normalizeUppercase(
+      name
+    );
+
+
+  if (!partyName) {
+
+    throw new Error(
+      "PLEASE ENTER PARTY NAME."
+    );
+
+  }
+
+
+  const existing =
+    await api(
+      "/rest/v1/parties" +
+      "?select=id,name" +
+      "&name=eq." +
+      encodeURIComponent(
+        partyName
+      ) +
+      "&limit=1"
+    );
+
+
+  if (existing?.length) {
+
+    return existing[0];
+
+  }
+
+
+  const data =
+    await api(
+      "/rest/v1/parties",
+      {
+        method: "POST",
+
+        headers: {
+          "Prefer":
+            "return=representation"
+        },
+
+        body:
+          JSON.stringify({
+            name:
+              partyName,
+
+            is_active:
+              true
+          })
+      }
+    );
+
+
+  return data[0];
+
+}
+
+
+/* =========================================================
+   CREATE BRANCH
+   ========================================================= */
+
+async function createBranch(
+  name
+) {
+
+  const branchName =
+    normalizeUppercase(
+      name
+    );
+
+
+  if (!branchName) {
+
+    throw new Error(
+      "PLEASE ENTER BRANCH NAME."
+    );
+
+  }
+
+
+  const existing =
+    await api(
+      "/rest/v1/branches" +
+      "?select=id,name" +
+      "&name=eq." +
+      encodeURIComponent(
+        branchName
+      ) +
+      "&limit=1"
+    );
+
+
+  if (existing?.length) {
+
+    return existing[0];
+
+  }
+
+
+  const data =
+    await api(
+      "/rest/v1/branches",
+      {
+        method: "POST",
+
+        headers: {
+          "Prefer":
+            "return=representation"
+        },
+
+        body:
+          JSON.stringify({
+            name:
+              branchName,
+
+            is_active:
+              true
+          })
+      }
+    );
+
+
+  return data[0];
+
+}
+
+
+/* =========================================================
+   PARTY / BRANCH SMART INPUT
+   ========================================================= */
+
+function setupSmartInput(
+  inputId,
+  table,
+  label
+) {
+
+  const input =
+    document.getElementById(
+      inputId
+    );
+
+
+  if (!input) {
+    return;
+  }
+
+
+  input.addEventListener(
+    "input",
+    async function () {
+
+      input.value =
+        normalizeUppercase(
+          input.value
+        );
+
+
+      const searchText =
+        input.value.trim();
+
+
+      if (!searchText) {
+        return;
+      }
+
+
+      try {
+
+        const rows =
+          await api(
+            "/rest/v1/" +
+            table +
+            "?select=id,name" +
+            "&name=ilike.*" +
+            encodeURIComponent(
+              searchText
+            ) +
+            "*" +
+            "&is_active=eq.true" +
+            "&order=name.asc" +
+            "&limit=10"
+          );
+
+
+        console.log(
+          label.toUpperCase() +
+          " SEARCH:",
+          rows
+        );
+
+
+        /*
+         * Native datalist is used when available.
+         */
+
+        const listId =
+          table === "parties"
+            ? "party-list"
+            : "branch-list";
+
+
+        const list =
+          document.getElementById(
+            listId
+          );
+
+
+        if (list) {
+
+          list.innerHTML =
+            "";
+
+
+          (rows || []).forEach(
+            function (row) {
+
+              const option =
+                document.createElement(
+                  "option"
+                );
+
+
+              option.value =
+                normalizeUppercase(
+                  row.name
+                );
+
+
+              list.appendChild(
+                option
+              );
+
+            }
+          );
+
+        }
+
+
+      } catch (error) {
+
+        console.error(
+          label.toUpperCase() +
+          " SEARCH ERROR:",
+          error
+        );
+
+      }
+
     }
   );
 
 
+  input.addEventListener(
+    "blur",
+    function () {
+
+      input.value =
+        normalizeUppercase(
+          input.value
+        );
+
+    }
+  );
+
+}
+
+
 /* =========================================================
-   SIDEBAR
+   INITIALISE SMART INPUTS
+   ========================================================= */
+
+setupSmartInput(
+  "party-name",
+  "parties",
+  "party"
+);
+
+
+setupSmartInput(
+  "branch-name",
+  "branches",
+  "branch"
+);
+
+
+/* =========================================================
+   RECEIVE GOODS
+   ========================================================= */
+
+if (shipmentForm) {
+
+  shipmentForm.addEventListener(
+    "submit",
+    async function (event) {
+
+      event.preventDefault();
+
+
+      const saveButton =
+        shipmentForm.querySelector(
+          'button[type="submit"]'
+        );
+
+
+      const message =
+        document.getElementById(
+          "form-message"
+        );
+
+
+      const receivedDate =
+        document.getElementById(
+          "received-date"
+        )?.value;
+
+
+      const lrNumber =
+        normalizeUppercase(
+          document.getElementById(
+            "lr-number"
+          )?.value
+        );
+
+
+      const partyName =
+        normalizeUppercase(
+          document.getElementById(
+            "party-name"
+          )?.value
+        );
+
+
+      const branchName =
+        normalizeUppercase(
+          document.getElementById(
+            "branch-name"
+          )?.value
+        );
+
+
+      const quantity =
+        document.getElementById(
+          "quantity"
+        )?.value;
+
+
+      const amount =
+        document.getElementById(
+          "amount"
+        )?.value;
+
+
+      const paymentType =
+        document.getElementById(
+          "payment-type"
+        )?.value;
+
+
+      const remarks =
+        normalizeUppercase(
+          document.getElementById(
+            "remarks"
+          )?.value
+        );
+
+
+      /* ---------------------------------------------------
+         VALIDATION
+         --------------------------------------------------- */
+
+      if (!receivedDate) {
+
+        message.textContent =
+          "PLEASE SELECT RECEIVED DATE.";
+
+        return;
+
+      }
+
+
+      if (!lrNumber) {
+
+        message.textContent =
+          "PLEASE ENTER LR NUMBER.";
+
+        return;
+
+      }
+
+
+      if (!partyName) {
+
+        message.textContent =
+          "PLEASE ENTER PARTY NAME.";
+
+        return;
+
+      }
+
+
+      if (!branchName) {
+
+        message.textContent =
+          "PLEASE ENTER FROM BRANCH.";
+
+        return;
+
+      }
+
+
+      if (
+        !quantity ||
+        Number(quantity) <= 0
+      ) {
+
+        message.textContent =
+          "PLEASE ENTER A VALID QUANTITY.";
+
+        return;
+
+      }
+
+
+      if (
+        amount === "" ||
+        Number(amount) < 0
+      ) {
+
+        message.textContent =
+          "PLEASE ENTER A VALID AMOUNT.";
+
+        return;
+
+      }
+
+
+      if (
+        ![
+          "TOPAY",
+          "TBB",
+          "PAID"
+        ].includes(paymentType)
+      ) {
+
+        message.textContent =
+          "PLEASE SELECT TOPAY, TBB OR PAID.";
+
+        return;
+
+      }
+
+
+      const token =
+        sessionStorage.getItem(
+          "chennai_access_token"
+        );
+
+
+      if (!token) {
+
+        message.textContent =
+          "YOUR LOGIN SESSION HAS EXPIRED. PLEASE SIGN IN AGAIN.";
+
+        showLogin();
+
+        return;
+
+      }
+
+
+      if (saveButton) {
+
+        saveButton.disabled =
+          true;
+
+        saveButton.textContent =
+          "SAVING...";
+
+      }
+
+
+      message.textContent =
+        "SAVING GOODS RECEIPT...";
+
+
+      try {
+
+        /* -------------------------------------------------
+           FIND OR CREATE PARTY
+           ------------------------------------------------- */
+
+        let party;
+
+        try {
+
+          party =
+            await findPartyId(
+              partyName
+            );
+
+        } catch {
+
+          const create =
+            confirm(
+              "PARTY \"" +
+              partyName +
+              "\" DOES NOT EXIST.\n\n" +
+              "CREATE THIS PARTY?"
+            );
+
+
+          if (!create) {
+            throw new Error(
+              "PARTY NOT CREATED."
+            );
+          }
+
+
+          const newParty =
+            await createParty(
+              partyName
+            );
+
+
+          party =
+            newParty.id;
+
+        }
+
+
+        /* -------------------------------------------------
+           FIND OR CREATE BRANCH
+           ------------------------------------------------- */
+
+        let branch;
+
+        try {
+
+          branch =
+            await findBranchId(
+              branchName
+            );
+
+        } catch {
+
+          const create =
+            confirm(
+              "BRANCH \"" +
+              branchName +
+              "\" DOES NOT EXIST.\n\n" +
+              "CREATE THIS BRANCH?"
+            );
+
+
+          if (!create) {
+            throw new Error(
+              "BRANCH NOT CREATED."
+            );
+          }
+
+
+          const newBranch =
+            await createBranch(
+              branchName
+            );
+
+
+          branch =
+            newBranch.id;
+
+        }
+
+
+        /* -------------------------------------------------
+           SAVE SHIPMENT
+           ------------------------------------------------- */
+
+        const shipment =
+          await api(
+            "/rest/v1/shipments",
+            {
+              method: "POST",
+
+              headers: {
+                "Prefer":
+                  "return=representation"
+              },
+
+              body:
+                JSON.stringify({
+
+                  received_date:
+                    receivedDate,
+
+                  lr_number:
+                    lrNumber,
+
+                  party_id:
+                    party,
+
+                  quantity:
+                    Number(quantity),
+
+                  amount:
+                    Number(amount),
+
+                  payment_type:
+                    paymentType,
+
+                  from_branch_id:
+                    branch,
+
+                  delivery_date:
+                    null,
+
+                  accounts_date:
+                    null,
+
+                  remarks:
+                    remarks || null
+
+                })
+            }
+          );
+
+
+        const savedShipment =
+          shipment[0];
+
+
+        /* -------------------------------------------------
+           RECEIVED EVENT
+           ------------------------------------------------- */
+
+        try {
+
+          await api(
+            "/rest/v1/shipment_events",
+            {
+              method: "POST",
+
+              body:
+                JSON.stringify({
+
+                  shipment_id:
+                    savedShipment.id,
+
+                  event_type:
+                    "RECEIVED",
+
+                  event_date:
+                    receivedDate,
+
+                  notes:
+                    remarks || null
+
+                })
+            }
+          );
+
+        } catch (eventError) {
+
+          console.warn(
+            "EVENT COULD NOT BE SAVED:",
+            eventError
+          );
+
+        }
+
+
+        message.textContent =
+          "RECEIVE GOODS SAVED SUCCESSFULLY.";
+
+
+        shipmentForm.reset();
+
+
+        await loadAllData();
+
+
+        console.log(
+          "SHIPMENT SAVED:",
+          savedShipment
+        );
+
+
+      } catch (error) {
+
+        console.error(
+          "RECEIVE GOODS ERROR:",
+          error
+        );
+
+
+        message.textContent =
+          String(
+            error.message
+          ).toUpperCase();
+
+
+      } finally {
+
+        if (saveButton) {
+
+          saveButton.disabled =
+            false;
+
+          saveButton.textContent =
+            "SAVE GOODS RECEIPT";
+
+        }
+
+      }
+
+    }
+  );
+
+}
+
+
+/* =========================================================
+   LOAD SHIPMENTS
+   IMPORTANT:
+   parties uses `name`
+   branches uses `name`
+   ========================================================= */
+
+async function loadShipments() {
+
+  try {
+
+    const shipments =
+      await api(
+        "/rest/v1/shipments" +
+        "?select=*," +
+        "parties(id,name,phone)," +
+        "branches(id,name)" +
+        "&order=created_at.desc" +
+        "&limit=5000"
+      );
+
+
+    window.allShipments =
+      shipments || [];
+
+
+    console.log(
+      "SHIPMENTS LOADED:",
+      window.allShipments.length
+    );
+
+
+    return window.allShipments;
+
+
+  } catch (error) {
+
+    console.error(
+      "SHIPMENTS LOAD FAILED:",
+      error
+    );
+
+
+    throw error;
+
+  }
+
+}
+
+
+/* =========================================================
+   SHIPMENT STATUS
+   ========================================================= */
+
+function getShipmentStatus(
+  shipment
+) {
+
+  if (
+    shipment.delivery_date
+  ) {
+
+    if (
+      shipment.payment_type ===
+      "TOPAY" &&
+      !shipment.accounts_date
+    ) {
+
+      return "ACCOUNTS PENDING";
+
+    }
+
+
+    return "COMPLETED";
+
+  }
+
+
+  return "PENDING DELIVERY";
+
+}
+
+
+/* =========================================================
+   DASHBOARD
+   ========================================================= */
+
+async function loadDashboard() {
+
+  const shipments =
+    window.allShipments || [];
+
+
+  const today =
+    new Date()
+      .toISOString()
+      .slice(0, 10);
+
+
+  const receivedToday =
+    shipments.filter(
+      shipment =>
+        shipment.received_date ===
+        today
+    ).length;
+
+
+  const pendingDelivery =
+    shipments.filter(
+      shipment =>
+        !shipment.delivery_date
+    ).length;
+
+
+  /*
+   * IMPORTANT:
+   * ONLY TOPAY + DELIVERED + NOT ACCOUNTS
+   */
+
+  const accountsPending =
+    shipments.filter(
+      shipment =>
+        shipment.payment_type ===
+          "TOPAY" &&
+        shipment.delivery_date &&
+        !shipment.accounts_date
+    ).length;
+
+
+  const completedToday =
+    shipments.filter(
+      shipment =>
+        shipment.delivery_date ===
+        today
+    ).length;
+
+
+  setText(
+    "stat-received",
+    receivedToday
+  );
+
+
+  setText(
+    "stat-delivery",
+    pendingDelivery
+  );
+
+
+  setText(
+    "stat-accounts",
+    accountsPending
+  );
+
+
+  setText(
+    "stat-completed",
+    completedToday
+  );
+
+
+  setText(
+    "delivery-count",
+    pendingDelivery
+  );
+
+
+  setText(
+    "accounts-count",
+    accountsPending
+  );
+
+
+  renderRecentTable(
+    shipments.slice(0, 10)
+  );
+
+}
+
+
+/* =========================================================
+   SET TEXT
+   ========================================================= */
+
+function setText(
+  id,
+  value
+) {
+
+  const element =
+    document.getElementById(id);
+
+
+  if (element) {
+
+    element.textContent =
+      value;
+
+  }
+
+}
+
+
+/* =========================================================
+   SHIPMENT PARTY NAME
+   ========================================================= */
+
+function partyName(
+  shipment
+) {
+
+  return (
+    shipment.parties?.name ||
+    shipment.party_name ||
+    "UNKNOWN PARTY"
+  );
+
+}
+
+
+/* =========================================================
+   SHIPMENT BRANCH NAME
+   ========================================================= */
+
+function branchName(
+  shipment
+) {
+
+  return (
+    shipment.branches?.name ||
+    shipment.branch_name ||
+    "UNKNOWN BRANCH"
+  );
+
+}
+
+
+/* =========================================================
+   PAYMENT LABEL
+   ========================================================= */
+
+function paymentLabel(
+  payment
+) {
+
+  if (payment === "TOPAY") {
+    return "TOPAY";
+  }
+
+  if (payment === "TBB") {
+    return "TBB";
+  }
+
+  if (payment === "PAID") {
+    return "PAID";
+  }
+
+  return payment || "-";
+
+}
+
+
+/* =========================================================
+   TABLE
+   ========================================================= */
+
+function shipmentTable(
+  shipments,
+  emptyMessage
+) {
+
+  if (
+    !shipments ||
+    !shipments.length
+  ) {
+
+    return `
+      <p class="empty">
+        ${escapeHtml(emptyMessage)}
+      </p>
+    `;
+
+  }
+
+
+  let html = `
+
+    <div class="table-wrapper">
+
+      <table>
+
+        <thead>
+
+          <tr>
+
+            <th>SL NO</th>
+
+            <th>LR NUMBER</th>
+
+            <th>RECEIVED</th>
+
+            <th>PARTY</th>
+
+            <th>FROM BRANCH</th>
+
+            <th>QTY</th>
+
+            <th>AMOUNT</th>
+
+            <th>PAYMENT</th>
+
+            <th>STATUS</th>
+
+            <th>ACTION</th>
+
+          </tr>
+
+        </thead>
+
+        <tbody>
+
+  `;
+
+
+  shipments.forEach(
+    function (shipment, index) {
+
+      const status =
+        getShipmentStatus(
+          shipment
+        );
+
+
+      html += `
+
+        <tr>
+
+          <td>
+            ${escapeHtml(
+              shipment.serial_no ??
+              index + 1
+            )}
+          </td>
+
+          <td>
+            <strong>
+              ${escapeHtml(
+                shipment.lr_number
+              )}
+            </strong>
+          </td>
+
+          <td>
+            ${formatDate(
+              shipment.received_date
+            )}
+          </td>
+
+          <td>
+            ${escapeHtml(
+              partyName(shipment)
+            )}
+          </td>
+
+          <td>
+            ${escapeHtml(
+              branchName(shipment)
+            )}
+          </td>
+
+          <td>
+            ${escapeHtml(
+              shipment.quantity
+            )}
+          </td>
+
+          <td>
+            ₹${formatAmount(
+              shipment.amount
+            )}
+          </td>
+
+          <td>
+            ${escapeHtml(
+              paymentLabel(
+                shipment.payment_type
+              )
+            )}
+          </td>
+
+          <td>
+            ${escapeHtml(
+              status
+            )}
+          </td>
+
+          <td>
+
+            ${
+              !shipment.delivery_date
+                ? `
+                  <button
+                    class="small-button"
+                    data-action="delivery"
+                    data-id="${escapeHtml(
+                      shipment.id
+                    )}"
+                  >
+                    DELIVER
+                  </button>
+                `
+                : ""
+            }
+
+            ${
+              shipment.delivery_date &&
+              shipment.payment_type ===
+                "TOPAY" &&
+              !shipment.accounts_date
+                ? `
+                  <button
+                    class="small-button"
+                    data-action="accounts"
+                    data-id="${escapeHtml(
+                      shipment.id
+                    )}"
+                  >
+                    ACCOUNTS
+                  </button>
+                `
+                : ""
+            }
+
+          </td>
+
+        </tr>
+
+      `;
+
+    }
+  );
+
+
+  html += `
+
+        </tbody>
+
+      </table>
+
+    </div>
+
+  `;
+
+
+  return html;
+
+}
+
+
+/* =========================================================
+   RECENT TABLE
+   ========================================================= */
+
+function renderRecentTable(
+  shipments
+) {
+
+  const container =
+    document.getElementById(
+      "recent-table"
+    );
+
+
+  if (!container) {
+    return;
+  }
+
+
+  container.innerHTML =
+    shipmentTable(
+      shipments,
+      "NO RECENT SHIPMENTS."
+    );
+
+}
+
+
+/* =========================================================
+   DELIVERY TABLE
+   ========================================================= */
+
+function renderDeliveryTable(
+  shipments
+) {
+
+  const container =
+    document.getElementById(
+      "delivery-table"
+    );
+
+
+  if (!container) {
+    return;
+  }
+
+
+  const pending =
+    shipments.filter(
+      shipment =>
+        !shipment.delivery_date
+    );
+
+
+  container.innerHTML =
+    shipmentTable(
+      pending,
+      "NO GOODS ARE CURRENTLY PENDING DELIVERY."
+    );
+
+}
+
+
+/* =========================================================
+   ACCOUNTS TABLE
+   ONLY TOPAY
+   ========================================================= */
+
+function renderAccountsTable(
+  shipments
+) {
+
+  const container =
+    document.getElementById(
+      "accounts-table"
+    );
+
+
+  if (!container) {
+    return;
+  }
+
+
+  const accounts =
+    shipments.filter(
+      shipment =>
+        shipment.payment_type ===
+          "TOPAY" &&
+        shipment.delivery_date &&
+        !shipment.accounts_date
+    );
+
+
+  container.innerHTML =
+    shipmentTable(
+      accounts,
+      "NO TOPAY SHIPMENTS ARE PENDING IN ACCOUNTS."
+    );
+
+}
+
+
+/* =========================================================
+   ALL SHIPMENTS
+   ========================================================= */
+
+function renderAllTable(
+  shipments
+) {
+
+  const container =
+    document.getElementById(
+      "all-table"
+    );
+
+
+  if (!container) {
+    return;
+  }
+
+
+  container.innerHTML =
+    shipmentTable(
+      shipments,
+      "NO SHIPMENTS FOUND."
+    );
+
+}
+
+
+/* =========================================================
+   STOCK
+   ========================================================= */
+
+function renderStockTable(
+  shipments
+) {
+
+  const container =
+    document.getElementById(
+      "stock-table"
+    );
+
+
+  if (!container) {
+    return;
+  }
+
+
+  /*
+   * CURRENT STOCK =
+   * GOODS RECEIVED BUT NOT DELIVERED
+   */
+
+  const stock =
+    shipments.filter(
+      shipment =>
+        !shipment.delivery_date
+    );
+
+
+  if (!stock.length) {
+
+    container.innerHTML = `
+      <p class="empty">
+        NO GOODS CURRENTLY IN STOCK.
+      </p>
+    `;
+
+    return;
+
+  }
+
+
+  let totalQuantity = 0;
+
+
+  stock.forEach(
+    shipment => {
+
+      totalQuantity +=
+        Number(
+          shipment.quantity || 0
+        );
+
+    }
+  );
+
+
+  container.innerHTML = `
+
+    <div class="stats-grid">
+
+      <article class="stat-card">
+
+        <span>
+          TOTAL SHIPMENTS IN STOCK
+        </span>
+
+        <strong>
+          ${stock.length}
+        </strong>
+
+      </article>
+
+      <article class="stat-card">
+
+        <span>
+          TOTAL QUANTITY IN STOCK
+        </span>
+
+        <strong>
+          ${totalQuantity}
+        </strong>
+
+      </article>
+
+    </div>
+
+
+    ${shipmentTable(
+      stock,
+      "NO GOODS CURRENTLY IN STOCK."
+    )}
+
+  `;
+
+}
+
+
+/* =========================================================
+   DELIVERY ACTION
+   ========================================================= */
+
+async function markDelivered(
+  shipmentId
+) {
+
+  const shipment =
+    window.allShipments.find(
+      item =>
+        String(item.id) ===
+        String(shipmentId)
+    );
+
+
+  if (!shipment) {
+
+    alert(
+      "SHIPMENT NOT FOUND."
+    );
+
+    return;
+
+  }
+
+
+  const today =
+    new Date()
+      .toISOString()
+      .slice(0, 10);
+
+
+  try {
+
+    await api(
+      "/rest/v1/shipments?id=eq." +
+      encodeURIComponent(
+        shipmentId
+      ),
+      {
+        method: "PATCH",
+
+        headers: {
+          "Prefer":
+            "return=representation"
+        },
+
+        body:
+          JSON.stringify({
+            delivery_date:
+              today
+          })
+      }
+    );
+
+
+    /*
+     * Delivery event
+     */
+
+    try {
+
+      await api(
+        "/rest/v1/shipment_events",
+        {
+          method: "POST",
+
+          body:
+            JSON.stringify({
+
+              shipment_id:
+                shipmentId,
+
+              event_type:
+                "DELIVERED",
+
+              event_date:
+                today,
+
+              notes:
+                null
+
+            })
+        }
+      );
+
+    } catch (eventError) {
+
+      console.warn(
+        "DELIVERY EVENT ERROR:",
+        eventError
+      );
+
+    }
+
+
+    await loadAllData();
+
+
+    alert(
+      "DELIVERY RECORDED SUCCESSFULLY."
+    );
+
+
+  } catch (error) {
+
+    console.error(
+      "DELIVERY ERROR:",
+      error
+    );
+
+
+    alert(
+      String(
+        error.message
+      ).toUpperCase()
+    );
+
+  }
+
+}
+
+
+/* =========================================================
+   MARK ACCOUNTS COMPLETED
+   ONLY TOPAY
+   ========================================================= */
+
+async function markAccountsCompleted(
+  shipmentId
+) {
+
+  const shipment =
+    window.allShipments.find(
+      item =>
+        String(item.id) ===
+        String(shipmentId)
+    );
+
+
+  if (!shipment) {
+
+    alert(
+      "SHIPMENT NOT FOUND."
+    );
+
+    return;
+
+  }
+
+
+  /*
+   * SAFETY CHECK
+   */
+
+  if (
+    shipment.payment_type !==
+    "TOPAY"
+  ) {
+
+    alert(
+      "ONLY TOPAY SHIPMENTS CAN MOVE TO ACCOUNTS."
+    );
+
+    return;
+
+  }
+
+
+  if (
+    !shipment.delivery_date
+  ) {
+
+    alert(
+      "SHIPMENT MUST BE DELIVERED BEFORE ACCOUNTS."
+    );
+
+    return;
+
+  }
+
+
+  const today =
+    new Date()
+      .toISOString()
+      .slice(0, 10);
+
+
+  try {
+
+    await api(
+      "/rest/v1/shipments?id=eq." +
+      encodeURIComponent(
+        shipmentId
+      ),
+      {
+        method: "PATCH",
+
+        headers: {
+          "Prefer":
+            "return=representation"
+        },
+
+        body:
+          JSON.stringify({
+            accounts_date:
+              today
+          })
+      }
+    );
+
+
+    /*
+     * Accounts event
+     */
+
+    try {
+
+      await api(
+        "/rest/v1/shipment_events",
+        {
+          method: "POST",
+
+          body:
+            JSON.stringify({
+
+              shipment_id:
+                shipmentId,
+
+              event_type:
+                "ACCOUNTS",
+
+              event_date:
+                today,
+
+              notes:
+                null
+
+            })
+        }
+      );
+
+    } catch (eventError) {
+
+      console.warn(
+        "ACCOUNTS EVENT ERROR:",
+        eventError
+      );
+
+    }
+
+
+    await loadAllData();
+
+
+    alert(
+      "ACCOUNTS COMPLETED SUCCESSFULLY."
+    );
+
+
+  } catch (error) {
+
+    console.error(
+      "ACCOUNTS ERROR:",
+      error
+    );
+
+
+    alert(
+      String(
+        error.message
+      ).toUpperCase()
+    );
+
+  }
+
+}
+
+
+/* =========================================================
+   TABLE ACTIONS
+   ========================================================= */
+
+document.addEventListener(
+  "click",
+  async function (event) {
+
+    const button =
+      event.target.closest(
+        "[data-action]"
+      );
+
+
+    if (!button) {
+      return;
+    }
+
+
+    const action =
+      button.dataset.action;
+
+
+    const id =
+      button.dataset.id;
+
+
+    if (action === "delivery") {
+
+      await markDelivered(
+        id
+      );
+
+    }
+
+
+    if (action === "accounts") {
+
+      await markAccountsCompleted(
+        id
+      );
+
+    }
+
+  }
+);
+
+
+/* =========================================================
+   SEARCH TABLES
+   ========================================================= */
+
+function setupShipmentSearch() {
+
+  document
+    .querySelectorAll(
+      ".search-input"
+    )
+    .forEach(
+      function (input) {
+
+        input.addEventListener(
+          "input",
+          function () {
+
+            const search =
+              normalizeUppercase(
+                input.value
+              );
+
+
+            const type =
+              input.dataset.search;
+
+
+            let source =
+              window.allShipments ||
+              [];
+
+
+            if (type === "delivery") {
+
+              source =
+                source.filter(
+                  shipment =>
+                    !shipment.delivery_date
+                );
+
+            }
+
+
+            if (type === "accounts") {
+
+              source =
+                source.filter(
+                  shipment =>
+                    shipment.payment_type ===
+                      "TOPAY" &&
+                    shipment.delivery_date &&
+                    !shipment.accounts_date
+                );
+
+            }
+
+
+            if (!search) {
+
+              renderSearchResult(
+                type,
+                source
+              );
+
+              return;
+
+            }
+
+
+            source =
+              source.filter(
+                function (shipment) {
+
+                  const text = (
+
+                    String(
+                      shipment.lr_number ||
+                      ""
+                    ) +
+
+                    " " +
+
+                    partyName(
+                      shipment
+                    ) +
+
+                    " " +
+
+                    branchName(
+                      shipment
+                    ) +
+
+                    " " +
+
+                    paymentLabel(
+                      shipment.payment_type
+                    )
+
+                  ).toUpperCase();
+
+
+                  return text.includes(
+                    search
+                  );
+
+                }
+              );
+
+
+            renderSearchResult(
+              type,
+              source
+            );
+
+          }
+        );
+
+      }
+    );
+
+}
+
+
+/* =========================================================
+   SEARCH RESULT
+   ========================================================= */
+
+function renderSearchResult(
+  type,
+  shipments
+) {
+
+  if (type === "delivery") {
+
+    const container =
+      document.getElementById(
+        "delivery-table"
+      );
+
+
+    if (container) {
+
+      container.innerHTML =
+        shipmentTable(
+          shipments,
+          "NO MATCHING SHIPMENTS."
+        );
+
+    }
+
+  }
+
+
+  if (type === "accounts") {
+
+    const container =
+      document.getElementById(
+        "accounts-table"
+      );
+
+
+    if (container) {
+
+      container.innerHTML =
+        shipmentTable(
+          shipments,
+          "NO MATCHING TOPAY SHIPMENTS."
+        );
+
+    }
+
+  }
+
+
+  if (type === "all") {
+
+    const container =
+      document.getElementById(
+        "all-table"
+      );
+
+
+    if (container) {
+
+      container.innerHTML =
+        shipmentTable(
+          shipments,
+          "NO MATCHING SHIPMENTS."
+        );
+
+    }
+
+  }
+
+}
+
+
+/* =========================================================
+   NAVIGATION
+   ========================================================= */
+
+function showPage(
+  pageName
+) {
+
+  document
+    .querySelectorAll(
+      ".page"
+    )
+    .forEach(
+      function (page) {
+
+        page.classList.remove(
+          "active"
+        );
+
+      }
+    );
+
+
+  const page =
+    document.getElementById(
+      pageName
+    );
+
+
+  if (page) {
+
+    page.classList.add(
+      "active"
+    );
+
+  }
+
+
+  document
+    .querySelectorAll(
+      ".nav-link"
+    )
+    .forEach(
+      function (item) {
+
+        item.classList.remove(
+          "active"
+        );
+
+      }
+    );
+
+
+  const nav =
+    document.querySelector(
+      '[data-page="' +
+      pageName +
+      '"]'
+    );
+
+
+  if (nav) {
+
+    nav.classList.add(
+      "active"
+    );
+
+  }
+
+
+  const titles = {
+
+    dashboard:
+      "GOOD MORNING",
+
+    receive:
+      "RECEIVE GOODS",
+
+    delivery:
+      "DELIVERY",
+
+    accounts:
+      "ACCOUNTS",
+
+    all:
+      "ALL SHIPMENTS",
+
+    stock:
+      "GODOWN STOCK"
+
+  };
+
+
+  setText(
+    "page-title",
+    titles[pageName] ||
+    "GOODS MANAGEMENT"
+  );
+
+
+  if (
+    pageName === "dashboard"
+  ) {
+
+    loadDashboard();
+
+  }
+
+
+  if (
+    pageName === "delivery"
+  ) {
+
+    renderDeliveryTable(
+      window.allShipments || []
+    );
+
+  }
+
+
+  if (
+    pageName === "accounts"
+  ) {
+
+    renderAccountsTable(
+      window.allShipments || []
+    );
+
+  }
+
+
+  if (
+    pageName === "all"
+  ) {
+
+    renderAllTable(
+      window.allShipments || []
+    );
+
+  }
+
+
+  if (
+    pageName === "stock"
+  ) {
+
+    renderStockTable(
+      window.allShipments || []
+    );
+
+  }
+
+}
+
+
+/* =========================================================
+   SIDEBAR NAVIGATION
    ========================================================= */
 
 document
@@ -1540,35 +2805,47 @@ document
     ".nav-link"
   )
   .forEach(
-    function (buttonElement) {
+    function (button) {
 
-      buttonElement
-        .addEventListener(
-          "click",
-          function () {
+      button.addEventListener(
+        "click",
+        function () {
 
-            const page =
-              buttonElement
-                .dataset
-                .page;
+          showPage(
+            button.dataset.page
+          );
 
-
-            if (
-              page ===
-              "receive"
-            ) {
-
-              resetForm();
-            }
-
-
-            showPage(page);
-
-          }
-        );
+        }
+      );
 
     }
   );
+
+
+/* =========================================================
+   RECEIVE BUTTON
+   ========================================================= */
+
+const receiveButton =
+  document.getElementById(
+    "receive-button"
+  );
+
+
+if (receiveButton) {
+
+  receiveButton.addEventListener(
+    "click",
+    function () {
+
+      showPage(
+        "receive"
+      );
+
+    }
+  );
+
+}
 
 
 /* =========================================================
@@ -1580,856 +2857,14 @@ document
     "[data-go]"
   )
   .forEach(
-    function (buttonElement) {
+    function (button) {
 
-      buttonElement
-        .addEventListener(
-          "click",
-          function () {
-
-            showPage(
-              buttonElement
-                .dataset
-                .go
-            );
-
-          }
-        );
-
-    }
-  );
-
-
-/* =========================================================
-   RECEIVE BUTTON
-   ========================================================= */
-
-$("#receive-button")
-  .addEventListener(
-    "click",
-    function () {
-
-      resetForm();
-
-      showPage(
-        "receive"
-      );
-
-    }
-  );
-
-
-/* =========================================================
-   RECEIVE GOODS FORM
-   ========================================================= */
-
-$("#shipment-form")
-  .addEventListener(
-    "submit",
-    function (event) {
-
-      event.preventDefault();
-
-
-      cloudAction(
-        async function () {
-
-          const data =
-            Object.fromEntries(
-              new FormData(
-                event.target
-              )
-            );
-
-
-          const partyName =
-            normalizeUppercase(
-              data.party_name
-            );
-
-
-          const branchName =
-            normalizeUppercase(
-              data.branch_name
-            );
-
-
-          if (!partyName) {
-
-            throw new Error(
-              "PARTY NAME IS REQUIRED."
-            );
-          }
-
-
-          if (!branchName) {
-
-            throw new Error(
-              "FROM BRANCH IS REQUIRED."
-            );
-          }
-
-
-          if (!data.received_date) {
-
-            throw new Error(
-              "RECEIVED DATE IS REQUIRED."
-            );
-          }
-
-
-          if (!data.lr_number?.trim()) {
-
-            throw new Error(
-              "LR NUMBER IS REQUIRED."
-            );
-          }
-
-
-          if (
-            !data.quantity ||
-            Number(data.quantity) <= 0
-          ) {
-
-            throw new Error(
-              "QUANTITY MUST BE GREATER THAN ZERO."
-            );
-          }
-
-
-          if (
-            data.amount === "" ||
-            Number(data.amount) < 0
-          ) {
-
-            throw new Error(
-              "AMOUNT CANNOT BE NEGATIVE."
-            );
-          }
-
-
-          const paymentType =
-            data.payment_type;
-
-
-          if (
-            ![
-              "TOPAY",
-              "TBB",
-              "PAID"
-            ].includes(
-              paymentType
-            )
-          ) {
-
-            throw new Error(
-              "INVALID PAYMENT TYPE."
-            );
-          }
-
-
-          const partyId =
-            await getOrCreateParty(
-              partyName
-            );
-
-
-          const branchId =
-            await getOrCreateBranch(
-              branchName
-            );
-
-
-          const payload = {
-
-            received_date:
-              data.received_date,
-
-            lr_number:
-              normalizeUppercase(
-                data.lr_number
-              ),
-
-            party_id:
-              partyId,
-
-            from_branch_id:
-              branchId,
-
-            quantity:
-              Number(
-                data.quantity
-              ),
-
-            amount:
-              Number(
-                data.amount
-              ),
-
-            payment_type:
-              paymentType,
-
-            remarks:
-              normalizeUppercase(
-                data.remarks
-              ) || null
-
-          };
-
-
-          if (editingId) {
-
-            await api(
-              `shipments?id=eq.${encodeURIComponent(
-                editingId
-              )}`,
-              {
-
-                method: "PATCH",
-
-                headers: {
-                  "Content-Type":
-                    "application/json",
-
-                  Prefer:
-                    "return=minimal"
-                },
-
-                body:
-                  JSON.stringify(
-                    payload
-                  )
-
-              }
-            );
-
-
-            editingId =
-              null;
-
-          }
-
-          else {
-
-            await api(
-              "shipments",
-              {
-
-                method: "POST",
-
-                headers: {
-                  "Content-Type":
-                    "application/json",
-
-                  Prefer:
-                    "return=minimal"
-                },
-
-                body:
-                  JSON.stringify([
-                    payload
-                  ])
-
-              }
-            );
-          }
-
-
-          resetForm();
-
-
-          $("#form-message")
-            .textContent =
-              "RECEIVE GOODS SAVED SUCCESSFULLY.";
-        }
-      );
-
-    }
-  );
-
-
-/* =========================================================
-   TABLE ACTIONS
-   ========================================================= */
-
-document.addEventListener(
-  "click",
-  function (event) {
-
-    const buttonElement =
-      event.target.closest(
-        "[data-action]"
-      );
-
-
-    if (!buttonElement) {
-      return;
-    }
-
-
-    const shipment =
-      shipments.find(
-        function (item) {
-
-          return (
-            String(item.id) ===
-            String(
-              buttonElement.dataset.id
-            )
-          );
-
-        }
-      );
-
-
-    if (!shipment) {
-      return;
-    }
-
-
-    const type =
-      buttonElement.dataset.action;
-
-
-    /* -----------------------------------------------------
-       EDIT
-       ----------------------------------------------------- */
-
-    if (
-      type === "edit"
-    ) {
-
-      editShipment(
-        shipment
-      );
-
-      return;
-    }
-
-
-    /* -----------------------------------------------------
-       DELETE
-       ----------------------------------------------------- */
-
-    if (
-      type === "delete"
-    ) {
-
-      if (
-        confirm(
-          `DELETE LR ${shipment.lr_number}? THIS CANNOT BE UNDONE.`
-        )
-      ) {
-
-        cloudAction(
-          function () {
-
-            return api(
-              `shipments?id=eq.${shipment.id}`,
-              {
-                method:
-                  "DELETE"
-              }
-            );
-
-          }
-        );
-      }
-
-
-      return;
-    }
-
-
-    /* -----------------------------------------------------
-       MARK UNDELIVERED
-       ----------------------------------------------------- */
-
-    if (
-      type === "undelivered"
-    ) {
-
-      if (
-        confirm(
-          `MARK LR ${shipment.lr_number} AS UNDELIVERED?`
-        )
-      ) {
-
-        cloudAction(
-          async function () {
-
-            await api(
-              `shipments?id=eq.${shipment.id}`,
-              {
-
-                method:
-                  "PATCH",
-
-                headers: {
-                  "Content-Type":
-                    "application/json"
-                },
-
-                body:
-                  JSON.stringify({
-                    delivery_date:
-                      null,
-
-                    accounts_date:
-                      null
-                  })
-
-              }
-            );
-
-
-            await api(
-              "shipment_events",
-              {
-
-                method:
-                  "POST",
-
-                headers: {
-                  "Content-Type":
-                    "application/json"
-                },
-
-                body:
-                  JSON.stringify([
-                    {
-                      shipment_id:
-                        shipment.id,
-
-                      event_type:
-                        "DELIVERY_REVERSED",
-
-                      event_date:
-                        today()
-                    }
-                  ])
-              }
-            );
-
-          }
-        );
-      }
-
-
-      return;
-    }
-
-
-    /* -----------------------------------------------------
-       DELIVERY / ACCOUNTS DIALOG
-       ----------------------------------------------------- */
-
-    if (
-      type !== "deliver" &&
-      type !== "accounts"
-    ) {
-
-      return;
-    }
-
-
-    currentAction = {
-      type,
-      shipment
-    };
-
-
-    const isDelivery =
-      type === "deliver";
-
-
-    $("#dialog-title")
-      .textContent =
-        isDelivery
-          ? "ENTER DELIVERY DATE"
-          : "ENTER A/C DATE";
-
-
-    $("#dialog-detail")
-      .textContent =
-        `${shipment.lr_number} · ${shipment.party_name}`;
-
-
-    const dateLabel =
-      $("#date-label");
-
-
-    if (dateLabel) {
-
-      dateLabel.textContent =
-        isDelivery
-          ? "DELIVERY DATE"
-          : "A/C DATE";
-    }
-
-
-    const dateInput =
-      $("#action-date");
-
-
-    if (isDelivery) {
-
-      dateInput.min =
-        shipment.received_date;
-
-      dateInput.value =
-        shipment.delivery_date ||
-        today();
-
-    }
-
-    else {
-
-      dateInput.min =
-        shipment.delivery_date;
-
-      dateInput.value =
-        shipment.accounts_date ||
-        today();
-    }
-
-
-    $("#date-dialog")
-      .showModal();
-
-  }
-);
-
-
-/* =========================================================
-   DATE ACTION
-   ========================================================= */
-
-$("#date-form")
-  .addEventListener(
-    "submit",
-    function (event) {
-
-      if (
-        event.submitter?.value ===
-        "cancel"
-      ) {
-
-        return;
-      }
-
-
-      event.preventDefault();
-
-
-      cloudAction(
-        async function () {
-
-          if (!currentAction) {
-            return;
-          }
-
-
-          const selectedDate =
-            $("#action-date").value;
-
-
-          if (!selectedDate) {
-
-            throw new Error(
-              "PLEASE SELECT A DATE."
-            );
-          }
-
-
-          const shipment =
-            currentAction.shipment;
-
-
-          const isDelivery =
-            currentAction.type ===
-            "deliver";
-
-
-          /* =================================================
-             DELIVERY
-             ================================================= */
-
-          if (isDelivery) {
-
-            await api(
-              `shipments?id=eq.${shipment.id}`,
-              {
-
-                method:
-                  "PATCH",
-
-                headers: {
-                  "Content-Type":
-                    "application/json"
-                },
-
-                body:
-                  JSON.stringify({
-                    delivery_date:
-                      selectedDate
-                  })
-
-              }
-            );
-
-
-            await api(
-              "shipment_events",
-              {
-
-                method:
-                  "POST",
-
-                headers: {
-                  "Content-Type":
-                    "application/json"
-                },
-
-                body:
-                  JSON.stringify([
-                    {
-
-                      shipment_id:
-                        shipment.id,
-
-                      event_type:
-                        "DELIVERY",
-
-                      event_date:
-                        selectedDate
-
-                    }
-                  ])
-              }
-            );
-
-
-            /*
-             * IMPORTANT:
-             *
-             * TOPAY:
-             *   remains in Accounts.
-             *
-             * TBB:
-             *   completed now.
-             *
-             * PAID:
-             *   completed now.
-             *
-             * We DO NOT set accounts_date
-             * for TBB or PAID.
-             */
-
-          }
-
-
-          /* =================================================
-             ACCOUNTS
-             ================================================= */
-
-          else {
-
-            /*
-             * Safety check:
-             * only TOPAY can enter Accounts.
-             */
-
-            if (
-              shipment.payment_type !==
-              "TOPAY"
-            ) {
-
-              throw new Error(
-                "ONLY TOPAY SHIPMENTS CAN ENTER ACCOUNTS."
-              );
-            }
-
-
-            await api(
-              `shipments?id=eq.${shipment.id}`,
-              {
-
-                method:
-                  "PATCH",
-
-                headers: {
-                  "Content-Type":
-                    "application/json"
-                },
-
-                body:
-                  JSON.stringify({
-                    accounts_date:
-                      selectedDate
-                  })
-
-              }
-            );
-
-
-            await api(
-              "shipment_events",
-              {
-
-                method:
-                  "POST",
-
-                headers: {
-                  "Content-Type":
-                    "application/json"
-                },
-
-                body:
-                  JSON.stringify([
-                    {
-
-                      shipment_id:
-                        shipment.id,
-
-                      event_type:
-                        "ACCOUNTS_ENTERED",
-
-                      event_date:
-                        selectedDate
-
-                    }
-                  ])
-              }
-            );
-
-          }
-
-
-          $("#date-dialog")
-            .close();
-
-
-          currentAction =
-            null;
-        }
-      );
-
-    }
-  );
-
-
-/* =========================================================
-   SEARCH
-   ========================================================= */
-
-document
-  .querySelectorAll(
-    "[data-search]"
-  )
-  .forEach(
-    function (input) {
-
-      input.addEventListener(
-        "input",
+      button.addEventListener(
+        "click",
         function () {
 
-          const query =
-            input.value
-              .toLowerCase()
-              .trim();
-
-
-          const kind =
-            input.dataset.search;
-
-
-          let data;
-
-
-          /* -------------------------------------------------
-             DELIVERY
-             ------------------------------------------------- */
-
-          if (
-            kind === "delivery"
-          ) {
-
-            data =
-              shipments.filter(
-                function (shipment) {
-
-                  return (
-                    !shipment.delivery_date
-                  );
-
-                }
-              );
-          }
-
-
-          /* -------------------------------------------------
-             ACCOUNTS
-
-             ONLY TOPAY
-             ------------------------------------------------- */
-
-          else if (
-            kind === "accounts"
-          ) {
-
-            data =
-              shipments.filter(
-                function (shipment) {
-
-                  return (
-                    shipment.payment_type ===
-                      "TOPAY" &&
-
-                    !!shipment.delivery_date &&
-
-                    !shipment.accounts_date
-                  );
-
-                }
-              );
-          }
-
-
-          /* -------------------------------------------------
-             ALL
-             ------------------------------------------------- */
-
-          else {
-
-            data =
-              shipments;
-          }
-
-
-          data =
-            data.filter(
-              function (shipment) {
-
-                return `
-                  ${shipment.lr_number}
-                  ${shipment.party_name}
-                  ${shipment.branch_name}
-                  ${shipment.remarks || ""}
-                `
-                  .toLowerCase()
-                  .includes(query);
-
-              }
-            );
-
-
-          table(
-            data,
-            `#${kind}-table`,
-            kind === "all"
-              ? "all"
-              : "workflow"
+          showPage(
+            button.dataset.go
           );
 
         }
@@ -2440,52 +2875,69 @@ document
 
 
 /* =========================================================
-   START
+   LOAD EVERYTHING
    ========================================================= */
 
-resetForm();
+async function loadAllData() {
+
+  try {
+
+    await Promise.all([
+      loadParties(),
+      loadBranches()
+    ]);
 
 
-if (token) {
-
-  showApp();
+    await loadShipments();
 
 
-  load()
-    .then(
-      function () {
-
-        showPage(
-          "dashboard"
-        );
-
-      }
-    )
-    .catch(
-      function (error) {
-
-        console.error(
-          "SESSION RESTORE ERROR:",
-          error
-        );
+    await loadDashboard();
 
 
-        token = null;
-
-
-        sessionStorage.removeItem(
-          SESSION_KEY
-        );
-
-
-        showLogin();
-
-      }
+    renderDeliveryTable(
+      window.allShipments
     );
+
+
+    renderAccountsTable(
+      window.allShipments
+    );
+
+
+    renderAllTable(
+      window.allShipments
+    );
+
+
+    renderStockTable(
+      window.allShipments
+    );
+
+
+    setupShipmentSearch();
+
+
+  } catch (error) {
+
+    console.error(
+      "DASHBOARD LOAD FAILED:",
+      error
+    );
+
+  }
 
 }
 
-else {
+
+/* =========================================================
+   START APPLICATION
+   ========================================================= */
+
+if (accessToken) {
+
+  showApp();
+
+} else {
 
   showLogin();
 
