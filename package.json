@@ -1,0 +1,24 @@
+{
+  "name": "chennai-goods-delivery-tracker",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Delivery tracking and shipment management system",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "next": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "better-sqlite3": "latest",
+    "xlsx": "latest"
+  },
+  "devDependencies": {
+    "@types/node": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "typescript": "latest"
+  }
+}
